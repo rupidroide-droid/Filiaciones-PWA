@@ -35,8 +35,9 @@ const esquemas = {
 function fechaHoraLocal() {
   const d = new Date();
   const dos = n => String(n).padStart(2, "0");
+
   return {
-    fecha: `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()}`,
+    fecha: `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`,
     hora: `${dos(d.getHours())}:${dos(d.getMinutes())}`
   };
 }
@@ -77,7 +78,8 @@ function campo(etiqueta, nombre, valor, tipo = "", indice = 0) {
   contenedor.style.cssText = "display:block;margin:12px 0;font-weight:600";
   contenedor.textContent = etiqueta;
   const entrada = document.createElement("input");
-  entrada.type = "text";
+  entrada.type = nombre === "fecha" ? "date" :
+               nombre === "hora" ? "time" : "text";;
   entrada.value = valor || "";
   entrada.dataset.campo = nombre;
   if (tipo) {
