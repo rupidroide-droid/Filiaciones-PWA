@@ -169,3 +169,205 @@ window.mostrar = function (nombre) {
   if (nombre === "Nueva actuación") nuevaActuacion();
   else alert(`${nombre}: módulo pendiente.`);
 };
+/* Filiaciones Beta 0.5 — integración del almacenamiento */
+(function () {
+  "use strict";
+
+  const mostrarAnterior = window.mostrar;
+  let iniciada = false;
+
+  function principal() {
+    return document.querySelector("main");
+  }
+
+  function aviso(mensaje) {
+    const p = document.createElement("p");
+    p.textContent = mensaje;
+    principal().appendChild(p);
+  }
+
+  function accion(nombre, fn) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = nombre;
+    b.addEventListener("click", fn);
+    principal().appendChild(b);
+    return b;
+  }
+
+  function titulo(texto) {
+    const h = document.createElement("h2");
+    h.textContent = texto;
+    principal().appendChild(h);
+  }
+
+  function limpiar() {
+    principal().replaceChildren();
+  }
+
+  function error(e) {
+    alert("Operación no completada: " + (e.message || e));
+  }
+
+  async function acceso() {
+    limpiar();
+    titulo("Acceso a Filiaciones");
+    try {
+      const configurada = await Almacenamiento.existe();
+      const p = document.createElement("input");
+      p.type = "password";
+      p.autocomplete = "off";
+      p.placeholder = configurada
+        ? "Contraseña general"
+        : "Nueva contraseña (mínimo 12 caracteres)";
+      p.style.cssText =
+        "display:block;width:100%;box-sizing:border-box;padding:12px;margin:12px 0;font-size:16px";
+      principal().appendChild(p);
+
+      let confirmacion = null;
+      if (!configurada) {
+        confirmacion = document.createElement("input");
+        confirmacion.type = "password";
+        confirmacion.autocomplete = "off";
+        confirmacion.placeholder = "Repite la contraseña";
+        confirmacion.style.cssText = p.style.cssText;
+        principal().appendChild(confirmacion);
+      }
+
+      accion(configurada ? "Desbloquear" : "Crear contraseña", async () => {
+        try {
+          if (!configurada) {
+            if (p.value !== confirmacion.value)
+              throw Error("Las contraseñas no coinciden");
+            await Almacenamiento.configurar(p.value);
+          } else {
+            await Almacenamiento.desbloquear(p.value);
+          }
+          p.value = "";
+          if (confirmacion) confirmacion.value = "";
+          menu();
+        } catch (e) {
+          error(e);
+        }
+      });
+
+      aviso("Versión de pruebas. No introduzcas datos policiales reales.");
+    } catch (e) {
+      error(e);
+    }
+  }
+
+  function bloquear() {
+    actuacion = null;
+    Almacenamiento.bloquear();
+    acceso();
+  }
+
+  function menu() {
+    if (!Almacenamiento.desbloqueado()) {
+      acceso();
+      return;
+    }
+    limpiar();
+    titulo("Filiaciones — acceso desbloqueado");
+    accion("Nueva actuación", () => {
+      nuevaActuacion();
+      controles();
+    });
+    accion("Consultar actuaciones guardadas", consultar);
+    accion("Bloquear aplicación", bloquear);
+    aviso("Los datos se almacenan localmente cifrados. Versión de prueba.");
+  }
+
+  function controles() {
+    if (!Almacenamiento.desbloqueado()) return;
+    accion("Guardar actuación cifrada", async () => {
+      try {
+        leer();
+        const id = await Almacenamiento.guardar(actuacion);
+        alert("Actuación guardada. Identificador: " + id);
+      } catch (e) {
+        error(e);
+      }
+    });
+    accion("Consultar actuaciones guardadas", () => {
+      actuacion = null;
+      consultar();
+    });
+    accion("Bloquear aplicación", bloquear);
+  }
+
+  async function consultar() {
+    if (!Almacenamiento.desbloqueado()) return acceso();
+    actuacion = null;
+    limpiar();
+    titulo("Actuaciones guardadas");
+    try {
+      const lista = await Almacenamiento.listar();
+      if (!lista.length) aviso("No hay actuaciones guardadas.");
+      for (const registro of lista) {
+        const fila = document.createElement("section");
+        fila.style.cssText = "padding:12px;margin:10px 0;border:1px solid #888;border-radius:8px";
+        const etiqueta = document.createElement("p");
+        etiqueta.textContent = "Referencia: " +
+          (registro.referencia || "(sin referencia)") +
+          " — " + (registro.fecha || "");
+        fila.appendChild(etiqueta);
+
+        const abrir = document.createElement("button");
+        abrir.textContent = "Abrir";
+        abrir.onclick = () => {
+          actuacion = registro;
+          dibujar();
+          controles();
+        };
+        fila.appendChild(abrir);
+
+        const eliminar = document.createElement("button");
+        eliminar.textContent = "Eliminar";
+        eliminar.onclick = async () => {
+          if (!confirm("¿Eliminar definitivamente esta actuación?")) return;
+          try {
+            await Almacenamiento.eliminar(registro.id);
+            consultar();
+          } catch (e) {
+            error(e);
+          }
+        };
+        fila.appendChild(eliminar);
+        principal().appendChild(fila);
+      }
+    } catch (e) {
+      error(e);
+    }
+    accion("Volver al menú", menu);
+    accion("Bloquear aplicación", bloquear);
+  }
+
+  window.mostrar = function (nombre) {
+    if (!Almacenamiento.desbloqueado()) {
+      acceso();
+      return;
+    }
+    if (nombre === "Nueva actuación") {
+      nuevaActuacion();
+      controles();
+    } else if (nombre === "Consultar actuaciones") {
+      consultar();
+    } else {
+      mostrarAnterior(nombre);
+    }
+  };
+
+  function iniciar() {
+    if (iniciada) return;
+    iniciada = true;
+    acceso();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", iniciar);
+  } else {
+    iniciar();
+  }
+})();
