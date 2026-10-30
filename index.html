@@ -26,6 +26,17 @@ h1{margin:0}small{color:#64748b}
 </main>
 <script src="./almacenamiento.js"></script>
 <script src="./app.js?v=061"></script>
+  <script src="./seguridad.js?v=070"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js")
+        .catch(error => {
+          console.error("Error al registrar el servicio sin conexión:", error);
+        });
+    });
+  }
+</script>
 </body>
 </html>
 
