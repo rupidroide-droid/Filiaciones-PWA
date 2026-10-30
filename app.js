@@ -3,16 +3,39 @@
 
 let actuacion = null;
 const esquemas = {
-  personas: [
-    ["nombre", "Nombre y apellidos"],
-    ["tipoDocumento", "Tipo de documento"],
-    ["numeroDocumento", "Número de documento"],
-    ["fechaNacimiento", "Fecha de nacimiento"],
-    ["nacionalidad", "Nacionalidad"],
-    ["domicilio", "Domicilio"],
-    ["telefono", "Teléfono"],
-    ["observaciones", "Observaciones"]
-  ],
+  
+
+personas: [
+
+  ["nombre", "Nombre y apellidos"],
+
+  ["tipoDocumento", "Tipo de documento"],
+
+  ["numeroDocumento", "Número de documento"],
+
+  ["fechaNacimiento", "Fecha de nacimiento"],
+
+  ["municipioNacimiento", "Municipio de nacimiento"],
+
+  ["provinciaNacimiento", "Provincia de nacimiento"],
+
+  ["paisNacimiento", "País de nacimiento"],
+
+  ["nombrePadre", "Nombre de pila del padre"],
+
+  ["nombreMadre", "Nombre de pila de la madre"],
+
+  ["nacionalidad", "Nacionalidad"],
+
+  ["domicilio", "Domicilio"],
+
+  ["telefono", "Teléfono"],
+
+  ["correoElectronico", "Correo electrónico"],
+
+  ["observaciones", "Observaciones"]
+
+],
   vehiculos: [
     ["matricula", "Matrícula"],
     ["marca", "Marca"],
@@ -78,8 +101,18 @@ function campo(etiqueta, nombre, valor, tipo = "", indice = 0) {
   contenedor.style.cssText = "display:block;margin:12px 0;font-weight:600";
   contenedor.textContent = etiqueta;
   const entrada = document.createElement("input");
-  entrada.type = nombre === "fecha" ? "date" :
-               nombre === "hora" ? "time" : "text";;
+  
+entrada.type =
+  (nombre === "fecha" || nombre === "fechaNacimiento")
+    ? "date"
+    : nombre === "hora"
+      ? "time"
+      : nombre === "correoElectronico"
+        ? "email"
+        : nombre === "telefono"
+          ? "tel"
+          : "text";
+
   entrada.value = valor || "";
   entrada.dataset.campo = nombre;
   if (tipo) {
