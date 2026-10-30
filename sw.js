@@ -1,16 +1,26 @@
 
-/* Filiaciones Beta 0.7 - solo archivos de la aplicación, nunca actuaciones */
-const CACHE = 'filiaciones-app-v080';
+
+/*
+ * Filiaciones Beta 0.8.1
+ * Caché de archivos de aplicación.
+ *
+ * No almacena actuaciones en Cache Storage.
+ * Las actuaciones permanecen en IndexedDB.
+ */
+
+const CACHE = "filiaciones-app-v081";
+
 const ARCHIVOS = [
-  './',
-  './index.html',
-  './app.js?v=061',
-  './almacenamiento.js',
-  './seguridad.js?v=071',
-  './copias.js?v=080'
+  "./",
+  "./index.html",
+  "./app.js?v=061",
+  "./almacenamiento.js",
+  "./seguridad.js?v=071",
+  "./copias.js?v=080",
+  "./boton-copias.js?v=081"
 ];
 
-self.addEventListener('install', event => {
+self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE)
       .then(cache => cache.addAll(ARCHIVOS))
@@ -18,31 +28,39 @@ self.addEventListener('install', event => {
   );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(Promise.all([
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(k => k.startsWith('filiaciones-app-') && k !== CACHE)
-          .map(k => caches.delete(k))
-      )
-    ),
-    self.clients.claim()
-  ]));
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    Promise.all([
+      caches.keys().then(keys =>
+        Promise.all(
+          keys
+            .filter(
+              key =>
+                key.startsWith("filiaciones-app-") &&
+                key !== CACHE
+            )
+            .map(key => caches.delete(key))
+        )
+      ),
+      self.clients.claim()
+    ])
+  );
 });
 
-self.addEventListener('fetch', event => {
+self.addEventListener("fetch", event => {
   const req = event.request;
 
-  if (
-    req.method !== 'GET' ||
-    new URL(req.url).origin !== self.location.origin
-  ) return;
+  if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-  const ruta = url.pathname;
-  const esNavegacion = req.mode === 'navigate';
-  const esArchivo = /\/(?:index\.html|app\.js|almacenamiento\.js|seguridad\.js)$/.test(ruta);
+
+  if (url.origin !== self.location.origin) return;
+
+  const esNavegacion = req.mode === "navigate";
+
+  const esArchivo = /\/(?:index\.html|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js)$/.test(
+    url.pathname
+  );
 
   if (!esNavegacion && !esArchivo) return;
 
@@ -52,16 +70,28 @@ self.addEventListener('fetch', event => {
     if (esNavegacion) {
       try {
         const respuesta = await fetch(req);
-        return respuesta.ok
-          ? respuesta
-          : (await cache.match('./index.html')) || respuesta;
+
+        if (respuesta.ok) {
+          return respuesta;
+        }
+
+        return (
+          (await cache.match("./index.html")) ||
+          respuesta
+        );
       } catch {
-        return (await cache.match('./index.html')) || Response.error();
+        return (
+          (await cache.match("./index.html")) ||
+          Response.error()
+        );
       }
     }
 
     const guardada = await cache.match(req);
-    if (guardada) return guardada;
+
+    if (guardada) {
+      return guardada;
+    }
 
     return fetch(req);
   })());
