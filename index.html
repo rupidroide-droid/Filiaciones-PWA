@@ -1,76 +1,121 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Filiaciones</title>
-<style>
-body{font-family:system-ui;background:#f3f5f9;margin:0;color:#17253c}
-header{background:#17365d;color:white;padding:25px 18px}
-main{padding:20px;max-width:600px;margin:auto}
-button{display:block;width:100%;padding:19px;margin:12px 0;border:1px solid #dce2eb;border-radius:12px;background:white;font-size:17px;text-align:left}
-h1{margin:0}small{color:#64748b}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17365d">
+  <title>Filiaciones</title>
+
+  <style>
+    body {
+      font-family: system-ui;
+      background: #f3f5f9;
+      margin: 0;
+      color: #17253c;
+    }
+
+    header {
+      background: #17365d;
+      color: white;
+      padding: 25px 18px;
+    }
+
+    main {
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 19px;
+      margin: 12px 0;
+      border: 1px solid #dce2eb;
+      border-radius: 12px;
+      background: white;
+      color: #087cf5;
+      font-size: 17px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    h1 {
+      margin: 0;
+    }
+
+    small {
+      color: #64748b;
+    }
+  </style>
 </head>
+
 <body>
-<header><h1>Filiaciones</h1><p>Registro local de actuaciones</p></header>
-<main>
-<h2>Menú principal</h2>
-<button onclick="mostrar('Nueva actuación')">＋ Nueva actuación</button>
-<button onclick="mostrar('Personas')">♙ Identificar persona</button>
-<button onclick="mostrar('Vehículos')">▣ Identificar vehículo</button>
-<button onclick="mostrar('Objetos')">◇ Identificar objeto</button>
-<button onclick="mostrar('Actuaciones')">☷ Consultar actuaciones</button>
-<p id="estado">Versión de demostración. No introduzcas datos reales.</p>
-<small>Beta 0.1 — Interfaz de prueba, sin almacenamiento.</small>
-</main>
-<script src="./almacenamiento.js"></script>
-<script src="./app.js?v=061"></script>
-<script src="./seguridad.js?v=071"></script>
-  
-<script src="./copias.js?v=080"></script>
+
+  <header>
+    <h1>Filiaciones</h1>
+    <p>Registro local de actuaciones</p>
+  </header>
+
+  <main>
+    <h2>Menú principal</h2>
+
+    <button onclick="mostrar('Nueva actuación')">
+      Nueva actuación
+    </button>
+
+    <button onclick="mostrar('Personas')">
+      Identificar persona
+    </button>
+
+    <button onclick="mostrar('Vehículos')">
+      Identificar vehículo
+    </button>
+
+    <button onclick="mostrar('Objetos')">
+      Identificar objeto
+    </button>
+
+    <button onclick="mostrar('Actuaciones')">
+      Consultar actuaciones
+    </button>
+
+    <p id="estado">
+      Versión de pruebas. No introduzcas datos reales.
+    </p>
+  </main>
+
+  <!-- Almacenamiento cifrado existente -->
+  <script src="./almacenamiento.js"></script>
+
+  <!-- Aplicación principal -->
+  <script src="./app.js?v=061"></script>
+
+  <!-- Bloqueo automático -->
+  <script src="./seguridad.js?v=071"></script>
+
+  <!-- Copias de seguridad cifradas -->
+  <script src="./copias.js?v=080"></script>
+
+  <!-- Botón de copias controlado por sesión -->
+  <script src="./boton-copias.js?v=081"></script>
+
+  <!-- Funcionamiento sin conexión -->
   <script>
-(() => {
-  function instalarBoton() {
-<script>
-(() => {
-  function instalarBoton() {
-    if (document.getElementById("boton-copia-cifrada")) return;
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("./sw.js")
+          .catch(error => {
+            console.error(
+              "Error al registrar Service Worker:",
+              error
+            );
+          });
+      });
+    }
+  </script>
 
-    const boton = document.createElement("button");
-    boton.id = "boton-copia-cifrada";
-    boton.type = "button";
-    boton.textContent = "Crear copia de seguridad cifrada";
-
-    boton.addEventListener("click", async () => {
-      try {
-        const cantidad = await Copias.exportar();
-        alert(
-          "Copia generada con " + cantidad +
-          " actuaciones cifradas. Comprueba dónde se ha guardado."
-        );
-      } catch (error) {
-        alert("No se pudo crear la copia: " + error.message);
-      }
-    });
-
-    document.body.appendChild(boton);
-  }
-
-  document.addEventListener("DOMContentLoaded", instalarBoton);
-})();
-</script>
-
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js")
-        .catch(error => {
-          console.error("Error al registrar el servicio sin conexión:", error);
-        });
-    });
-  }
-</script>
 </body>
 </html>
-
