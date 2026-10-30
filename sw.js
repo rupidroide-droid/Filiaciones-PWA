@@ -1,7 +1,7 @@
 
 /* Filiaciones Beta 0.7 - solo archivos de la aplicación, nunca actuaciones */
-const CACHE = 'filiaciones-app-v07';
-const ARCHIVOS = ['./', './index.html', './app.js?v=061', './almacenamiento.js', './seguridad.js?v=070'];
+const CACHE = 'filiaciones-app-v071';
+const ARCHIVOS = ['./', './index.html', './app.js?v=061', './almacenamiento.js', './seguridad.js?v=071'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
