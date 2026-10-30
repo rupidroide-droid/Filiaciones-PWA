@@ -27,6 +27,37 @@ h1{margin:0}small{color:#64748b}
 <script src="./almacenamiento.js"></script>
 <script src="./app.js?v=061"></script>
 <script src="./seguridad.js?v=071"></script>
+  
+<script src="./copias.js?v=080"></script>
+<script>
+(() => {
+  function instalarBoton() {
+    if (document.getElementById("boton-copia-cifrada")) return;
+
+    const boton = document.createElement("button");
+    boton.id = "boton-copia-cifrada";
+    boton.type = "button";
+    boton.textContent = "Crear copia de seguridad cifrada";
+
+    boton.addEventListener("click", async () => {
+      try {
+        const cantidad = await Copias.exportar();
+        alert(
+          "Copia generada con " + cantidad +
+          " actuaciones cifradas. Comprueba dónde se ha guardado."
+        );
+      } catch (error) {
+        alert("No se pudo crear la copia: " + error.message);
+      }
+    });
+
+    document.body.appendChild(boton);
+  }
+
+  document.addEventListener("DOMContentLoaded", instalarBoton);
+})();
+</script>
+
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
