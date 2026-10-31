@@ -1,14 +1,15 @@
 
 /*
- * FILIACIONES - EXPORTACIÓN WORD
- * Beta 0.9.9
+ * FILIACIONES - EXPORTACIÓN
+ * Beta 0.9.10
  *
- * Dos formatos:
- * 1. Ficha de filiación
- * 2. Texto para diligencia
+ * 1. Ficha Word (.docx)
+ * 2. Intercambio cifrado para Gestor Policial
  *
- * Genera DOCX sin bibliotecas externas.
- * Solo pruebas con datos ficticios.
+ * No genera diligencias.
+ * No asigna palabras clave policiales.
+ *
+ * PROTOTIPO: SOLO DATOS FICTICIOS.
  */
 "use strict";
 
@@ -16,82 +17,67 @@ window.Exportacion = (() => {
 
   const encoder = new TextEncoder();
 
-  const etiquetas = {
-    nombre: "Nombre y apellidos",
-    tipoDocumento: "Tipo de documento",
-    numeroDocumento: "Número de documento",
-    fechaNacimiento: "Fecha de nacimiento",
-    municipioNacimiento: "Municipio de nacimiento",
-    provinciaNacimiento: "Provincia de nacimiento",
-    paisNacimiento: "País de nacimiento",
-    nombrePadre: "Nombre del padre",
-    nombreMadre: "Nombre de la madre",
-    nacionalidad: "Nacionalidad",
-    domicilio: "Domicilio",
-    telefono: "Teléfono",
-    correoElectronico: "Correo electrónico",
-    observaciones: "Observaciones",
-    matricula: "Matrícula",
-    marca: "Marca",
-    modelo: "Modelo",
-    color: "Color",
-    bastidor: "Bastidor",
-    titular: "Titular (texto libre)",
-    conductor: "Conductor (texto libre)",
-    descripcion: "Descripción",
-    marcaModelo: "Marca y modelo",
-    numeroSerie: "Número de serie",
-    personaRelacionada: "Persona relacionada"
+  const MIME_DOCX =
+    "application/vnd.openxmlformats-officedocument." +
+    "wordprocessingml.document";
+
+  const CAMPOS = {
+    personas: [
+      ["nombre", "Nombre y apellidos"],
+      ["tipoDocumento", "Tipo de documento"],
+      ["numeroDocumento", "Número de documento"],
+      ["fechaNacimiento", "Fecha de nacimiento"],
+      ["municipioNacimiento", "Municipio de nacimiento"],
+      ["provinciaNacimiento", "Provincia de nacimiento"],
+      ["paisNacimiento", "País de nacimiento"],
+      ["nombrePadre", "Nombre del padre"],
+      ["nombreMadre", "Nombre de la madre"],
+      ["nacionalidad", "Nacionalidad"],
+      ["domicilio", "Domicilio"],
+      ["telefono", "Teléfono"],
+      ["correoElectronico", "Correo electrónico"],
+      ["observaciones", "Observaciones"]
+    ],
+    vehiculos: [
+      ["matricula", "Matrícula"],
+      ["marca", "Marca"],
+      ["modelo", "Modelo"],
+      ["color", "Color"],
+      ["bastidor", "Bastidor"],
+      ["titular", "Titular (texto libre)"],
+      ["conductor", "Conductor (texto libre)"],
+      ["observaciones", "Observaciones"]
+    ],
+    objetos: [
+      ["descripcion", "Descripción"],
+      ["marcaModelo", "Marca y modelo"],
+      ["numeroSerie", "Número de serie"],
+      ["personaRelacionada", "Persona relacionada"],
+      ["observaciones", "Observaciones"]
+    ]
   };
 
-  const camposPersona = [
-    "nombre",
-    "tipoDocumento",
-    "numeroDocumento",
-    "fechaNacimiento",
-    "municipioNacimiento",
-    "provinciaNacimiento",
-    "paisNacimiento",
-    "nombrePadre",
-    "nombreMadre",
-    "nacionalidad",
-    "domicilio",
-    "telefono",
-    "correoElectronico",
-    "observaciones"
-  ];
-
-  const camposVehiculo = [
-    "matricula",
-    "marca",
-    "modelo",
-    "color",
-    "bastidor",
-    "titular",
-    "conductor",
-    "observaciones"
-  ];
-
-  const camposObjeto = [
-    "descripcion",
-    "marcaModelo",
-    "numeroSerie",
-    "personaRelacionada",
-    "observaciones"
-  ];
-
-  function valor(v) {
-    return v == null ? "" : String(v).trim();
+  function valor(dato) {
+    return dato == null
+      ? ""
+      : String(dato).trim();
   }
 
-  function fecha(v) {
-    const s = valor(v);
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+  function fecha(dato) {
+    const texto = valor(dato);
+
+    const partes =
+      /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+
+    return partes
+      ? partes[3] + "/" +
+        partes[2] + "/" +
+        partes[1]
+      : texto;
   }
 
-  function escapar(s) {
-    return String(s)
+  function xml(texto) {
+    return String(texto)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -99,368 +85,335 @@ window.Exportacion = (() => {
       .replace(/'/g, "&apos;");
   }
 
-  function listas(a) {
+  function nombreSeguro(texto) {
+    return valor(texto)
+      .replace(/[\\/:*?"<>|]/g, "_")
+      .replace(/\s+/g, "_")
+      .slice(0, 60) ||
+      "Sin_referencia";
+  }
+
+  function listas(actuacion) {
     return {
-      personas: Array.isArray(a.personas) ? a.personas : [],
-      vehiculos: Array.isArray(a.vehiculos) ? a.vehiculos : [],
-      objetos: Array.isArray(a.objetos) ? a.objetos : []
+      personas: Array.isArray(actuacion.personas)
+        ? actuacion.personas
+        : [],
+      vehiculos: Array.isArray(actuacion.vehiculos)
+        ? actuacion.vehiculos
+        : [],
+      objetos: Array.isArray(actuacion.objetos)
+        ? actuacion.objetos
+        : []
     };
   }
 
-  function relaciones(vehiculo, personas) {
+  function personasVinculadas(vehiculo, personas) {
     const resultado = [];
 
-    for (const vinculo of
-      (Array.isArray(vehiculo.vinculos)
-        ? vehiculo.vinculos : [])) {
+    const vinculos =
+      Array.isArray(vehiculo.vinculos)
+        ? vehiculo.vinculos
+        : [];
 
+    for (const vinculo of vinculos) {
       const indice = personas.findIndex(
-        p => p.idPersona === vinculo.personaId
+        persona =>
+          persona.idPersona === vinculo.personaId
       );
 
       if (indice < 0) continue;
 
       const persona = personas[indice];
-      const nombre = valor(persona.nombre) ||
-        `Persona ${indice + 1}`;
 
-      const rol = valor(vinculo.rol) ||
-        "Relación sin especificar";
+      const nombre =
+        valor(persona.nombre) ||
+        "Persona " + (indice + 1);
 
-      resultado.push(`${nombre} (${rol})`);
+      const funcion =
+        valor(vinculo.rol) ||
+        "Sin especificar";
+
+      resultado.push(
+        nombre + " (" + funcion + ")"
+      );
     }
 
     return resultado;
   }
 
-  function linea(campo, dato) {
-    const v = campo.includes("Nacimiento") &&
-      campo.startsWith("fecha")
-      ? fecha(dato)
-      : valor(dato);
+  function vehiculosVinculados(persona, vehiculos) {
+    const resultado = [];
 
-    if (!v) return null;
+    vehiculos.forEach((vehiculo, indice) => {
+      const vinculos =
+        Array.isArray(vehiculo.vinculos)
+          ? vehiculo.vinculos
+          : [];
 
-    return `${etiquetas[campo] || campo}: ${v}`;
+      for (const vinculo of vinculos) {
+        if (
+          vinculo.personaId !==
+          persona.idPersona
+        ) {
+          continue;
+        }
+
+        const identificacion =
+          valor(vehiculo.matricula) ||
+          "Vehículo " + (indice + 1);
+
+        resultado.push(
+          identificacion +
+          " (" +
+          (valor(vinculo.rol) ||
+            "Sin especificar") +
+          ")"
+        );
+      }
+    });
+
+    return resultado;
   }
 
-  function bloqueCampos(registro, campos) {
-    return campos
-      .map(c => linea(c, registro[c]))
-      .filter(Boolean);
+  function campoDocumento(nombre, dato, etiqueta) {
+    let contenido = valor(dato);
+
+    if (nombre === "fechaNacimiento") {
+      contenido = fecha(dato);
+    }
+
+    if (!contenido) return null;
+
+    return {
+      tipo: "campo",
+      texto: etiqueta + ": " + contenido
+    };
   }
 
-  function textoActuacion(a) {
-    return textoDiligencia(a);
-  }
+  function fichaCompacta(actuacion) {
+    const {
+      personas,
+      vehiculos,
+      objetos
+    } = listas(actuacion);
 
-  function fichaCompacta(a) {
-    const {personas, vehiculos, objetos} = listas(a);
-    const p = [];
+    const parrafos = [];
 
-    p.push({
+    parrafos.push({
       tipo: "titulo",
       texto: "FICHA DE FILIACIÓN Y ACTUACIÓN"
     });
 
-    p.push({
-      tipo: "subtitulo",
+    parrafos.push({
+      tipo: "seccion",
       texto: "DATOS GENERALES"
     });
 
-    if (valor(a.referencia)) {
-      p.push({
-        tipo: "campo",
-        texto: `Referencia de actuación: ${valor(a.referencia)}`
-      });
+    const generales = [
+      [
+        "referencia",
+        "Referencia de actuación"
+      ],
+      [
+        "numeroAtestado",
+        "Número de atestado"
+      ],
+      ["fecha", "Fecha"],
+      ["hora", "Hora"],
+      ["lugar", "Lugar"],
+      [
+        "agentes",
+        "Agentes intervinientes"
+      ]
+    ];
+
+    for (const [nombre, etiqueta] of generales) {
+      const dato =
+        nombre === "fecha"
+          ? fecha(actuacion[nombre])
+          : actuacion[nombre];
+
+      const campo =
+        campoDocumento(nombre, dato, etiqueta);
+
+      if (campo) parrafos.push(campo);
     }
 
-    if (valor(a.numeroAtestado)) {
-      p.push({
-        tipo: "campo",
-        texto: `Número de atestado: ${valor(a.numeroAtestado)}`
-      });
-    }
-
-    if (valor(a.fecha)) {
-      p.push({
-        tipo: "campo",
-        texto: `Fecha: ${fecha(a.fecha)}`
-      });
-    }
-
-    if (valor(a.hora)) {
-      p.push({
-        tipo: "campo",
-        texto: `Hora: ${valor(a.hora)}`
-      });
-    }
-
-    if (valor(a.lugar)) {
-      p.push({
-        tipo: "campo",
-        texto: `Lugar: ${valor(a.lugar)}`
-      });
-    }
-
-    if (valor(a.agentes)) {
-      p.push({
-        tipo: "campo",
-        texto: `Agentes intervinientes: ${valor(a.agentes)}`
-      });
-    }
-
-    personas.forEach((persona, i) => {
-      p.push({
-        tipo: "subtitulo",
-        texto: `PERSONA ${i + 1}`
+    personas.forEach((persona, indice) => {
+      parrafos.push({
+        tipo: "seccion",
+        texto: "PERSONA " + (indice + 1)
       });
 
-      for (const texto of bloqueCampos(
-        persona, camposPersona
-      )) {
-        p.push({tipo: "campo", texto});
-      }
-
-      const asociados = [];
-
-      vehiculos.forEach((vehiculo, j) => {
-        const vinculos = Array.isArray(vehiculo.vinculos)
-          ? vehiculo.vinculos : [];
-
-        for (const vinculo of vinculos) {
-          if (vinculo.personaId !== persona.idPersona) {
-            continue;
-          }
-
-          const identificacion =
-            valor(vehiculo.matricula) ||
-            `Vehículo ${j + 1}`;
-
-          asociados.push(
-            `${identificacion}: ${valor(vinculo.rol) || "Sin especificar"}`
-          );
-        }
-      });
-
-      if (asociados.length) {
-        p.push({
-          tipo: "campo",
-          texto: "Vehículos vinculados: " +
-            asociados.join("; ")
-        });
-      }
-    });
-
-    vehiculos.forEach((vehiculo, i) => {
-      p.push({
-        tipo: "subtitulo",
-        texto: `VEHÍCULO ${i + 1}`
-      });
-
-      for (const texto of bloqueCampos(
-        vehiculo, camposVehiculo
-      )) {
-        p.push({tipo: "campo", texto});
-      }
-
-      const vinculos = relaciones(vehiculo, personas);
-
-      if (vinculos.length) {
-        p.push({
-          tipo: "campo",
-          texto: "Personas vinculadas: " +
-            vinculos.join("; ")
-        });
-      }
-    });
-
-    objetos.forEach((objeto, i) => {
-      p.push({
-        tipo: "subtitulo",
-        texto: `OBJETO ${i + 1}`
-      });
-
-      for (const texto of bloqueCampos(
-        objeto, camposObjeto
-      )) {
-        p.push({tipo: "campo", texto});
-      }
-    });
-
-    return p;
-  }
-
-  function textoDiligencia(a) {
-    const {personas, vehiculos, objetos} = listas(a);
-    const p = [];
-
-    p.push({
-      tipo: "titulo",
-      texto: "TEXTO PARA DILIGENCIA"
-    });
-
-    const identificadores = [];
-
-    if (valor(a.referencia)) {
-      identificadores.push(
-        `Referencia de actuación: ${valor(a.referencia)}`
-      );
-    }
-
-    if (valor(a.numeroAtestado)) {
-      identificadores.push(
-        `Número de atestado: ${valor(a.numeroAtestado)}`
-      );
-    }
-
-    for (const texto of identificadores) {
-      p.push({tipo: "campo", texto});
-    }
-
-    const lugar = valor(a.lugar);
-    const hora = valor(a.hora);
-    const dia = fecha(a.fecha);
-
-    const circunstancias = [];
-
-    if (lugar) circunstancias.push(`En ${lugar}`);
-    if (hora) circunstancias.push(`siendo las ${hora} horas`);
-    if (dia) circunstancias.push(`del día ${dia}`);
-
-    if (circunstancias.length) {
-      p.push({
-        tipo: "parrafo",
-        texto: circunstancias.join(", ") + "."
-      });
-    }
-
-    if (valor(a.agentes)) {
-      p.push({
-        tipo: "parrafo",
-        texto: `Agentes intervinientes: ${valor(a.agentes)}.`
-      });
-    }
-
-    personas.forEach((persona, i) => {
-      const datos = bloqueCampos(
-        persona, camposPersona
-      );
-
-      if (!datos.length) return;
-
-      p.push({
-        tipo: "parrafo",
-        texto: `Persona ${i + 1}. ` +
-          datos.join("; ") + "."
-      });
-    });
-
-    vehiculos.forEach((vehiculo, i) => {
-      const datos = bloqueCampos(
-        vehiculo, camposVehiculo
-      );
-
-      const vinculos = relaciones(
-        vehiculo, personas
-      );
-
-      if (vinculos.length) {
-        datos.push(
-          "Personas vinculadas: " +
-          vinculos.join("; ")
+      for (
+        const [nombre, etiqueta]
+        of CAMPOS.personas
+      ) {
+        const campo = campoDocumento(
+          nombre,
+          persona[nombre],
+          etiqueta
         );
+
+        if (campo) parrafos.push(campo);
       }
 
-      if (!datos.length) return;
+      const vinculados =
+        vehiculosVinculados(persona, vehiculos);
 
-      p.push({
-        tipo: "parrafo",
-        texto: `Vehículo ${i + 1}. ` +
-          datos.join("; ") + "."
-      });
+      if (vinculados.length) {
+        parrafos.push({
+          tipo: "campo",
+          texto:
+            "Vehículos vinculados: " +
+            vinculados.join("; ")
+        });
+      }
     });
 
-    objetos.forEach((objeto, i) => {
-      const datos = bloqueCampos(
-        objeto, camposObjeto
-      );
-
-      if (!datos.length) return;
-
-      p.push({
-        tipo: "parrafo",
-        texto: `Objeto ${i + 1}. ` +
-          datos.join("; ") + "."
+    vehiculos.forEach((vehiculo, indice) => {
+      parrafos.push({
+        tipo: "seccion",
+        texto: "VEHÍCULO " + (indice + 1)
       });
+
+      for (
+        const [nombre, etiqueta]
+        of CAMPOS.vehiculos
+      ) {
+        const campo = campoDocumento(
+          nombre,
+          vehiculo[nombre],
+          etiqueta
+        );
+
+        if (campo) parrafos.push(campo);
+      }
+
+      const vinculados =
+        personasVinculadas(vehiculo, personas);
+
+      if (vinculados.length) {
+        parrafos.push({
+          tipo: "campo",
+          texto:
+            "Personas vinculadas: " +
+            vinculados.join("; ")
+        });
+      }
     });
 
-    return p;
+    objetos.forEach((objeto, indice) => {
+      parrafos.push({
+        tipo: "seccion",
+        texto: "OBJETO " + (indice + 1)
+      });
+
+      for (
+        const [nombre, etiqueta]
+        of CAMPOS.objetos
+      ) {
+        const campo = campoDocumento(
+          nombre,
+          objeto[nombre],
+          etiqueta
+        );
+
+        if (campo) parrafos.push(campo);
+      }
+    });
+
+    return parrafos;
   }
 
-  function parrafoXML(item) {
-    const tipo = item.tipo || "parrafo";
-
-    const estilo = {
+  function parrafoXML(parrafo) {
+    const estilos = {
       titulo: "TituloFicha",
-      subtitulo: "SeccionFicha",
-      campo: "CampoFicha",
-      parrafo: "TextoFicha"
-    }[tipo] || "TextoFicha";
+      seccion: "SeccionFicha",
+      campo: "CampoFicha"
+    };
+
+    const estilo =
+      estilos[parrafo.tipo] ||
+      "CampoFicha";
 
     return (
-      `<w:p>` +
-      `<w:pPr><w:pStyle w:val="${estilo}"/></w:pPr>` +
-      `<w:r><w:t xml:space="preserve">` +
-      escapar(item.texto) +
-      `</w:t></w:r>` +
-      `</w:p>`
+      "<w:p>" +
+      "<w:pPr>" +
+      '<w:pStyle w:val="' +
+      estilo +
+      '"/>' +
+      "</w:pPr>" +
+      "<w:r>" +
+      '<w:t xml:space="preserve">' +
+      xml(parrafo.texto) +
+      "</w:t>" +
+      "</w:r>" +
+      "</w:p>"
     );
   }
 
   function documentoXML(parrafos) {
     return (
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-      '<w:body>' +
+      '<?xml version="1.0" encoding="UTF-8" ' +
+      'standalone="yes"?>' +
+      '<w:document xmlns:w="' +
+      'http://schemas.openxmlformats.org/' +
+      'wordprocessingml/2006/main">' +
+      "<w:body>" +
       parrafos.map(parrafoXML).join("") +
-      '<w:sectPr>' +
+      "<w:sectPr>" +
       '<w:pgSz w:w="11906" w:h="16838"/>' +
-      '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>' +
-      '</w:sectPr>' +
-      '</w:body></w:document>'
+      '<w:pgMar w:top="1134" ' +
+      'w:right="1134" w:bottom="1134" ' +
+      'w:left="1134"/>' +
+      "</w:sectPr>" +
+      "</w:body></w:document>"
     );
   }
 
   function estilosXML() {
     return (
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">' +
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<w:styles xmlns:w="' +
+      'http://schemas.openxmlformats.org/' +
+      'wordprocessingml/2006/main">' +
+
+      '<w:style w:type="paragraph" ' +
+      'w:default="1" w:styleId="Normal">' +
       '<w:name w:val="Normal"/>' +
-      '<w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="21"/></w:rPr>' +
-      '</w:style>' +
-      '<w:style w:type="paragraph" w:styleId="TituloFicha">' +
+      '<w:rPr>' +
+      '<w:rFonts w:ascii="Aptos" ' +
+      'w:hAnsi="Aptos"/>' +
+      '<w:sz w:val="21"/>' +
+      '</w:rPr></w:style>' +
+
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="TituloFicha">' +
       '<w:name w:val="Título ficha"/>' +
-      '<w:pPr><w:spacing w:after="240"/><w:keepNext/></w:pPr>' +
-      '<w:rPr><w:b/><w:sz w:val="30"/></w:rPr>' +
-      '</w:style>' +
-      '<w:style w:type="paragraph" w:styleId="SeccionFicha">' +
+      '<w:pPr><w:spacing w:after="240"/>' +
+      '<w:keepNext/></w:pPr>' +
+      '<w:rPr><w:b/><w:sz w:val="30"/>' +
+      '</w:rPr></w:style>' +
+
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="SeccionFicha">' +
       '<w:name w:val="Sección ficha"/>' +
-      '<w:pPr><w:spacing w:before="220" w:after="100"/><w:keepNext/></w:pPr>' +
-      '<w:rPr><w:b/><w:sz w:val="23"/></w:rPr>' +
-      '</w:style>' +
-      '<w:style w:type="paragraph" w:styleId="CampoFicha">' +
+      '<w:pPr><w:spacing w:before="220" ' +
+      'w:after="100"/><w:keepNext/>' +
+      '</w:pPr>' +
+      '<w:rPr><w:b/><w:sz w:val="23"/>' +
+      '</w:rPr></w:style>' +
+
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="CampoFicha">' +
       '<w:name w:val="Campo ficha"/>' +
-      '<w:pPr><w:spacing w:after="55"/></w:pPr>' +
-      '<w:rPr><w:sz w:val="20"/></w:rPr>' +
-      '</w:style>' +
-      '<w:style w:type="paragraph" w:styleId="TextoFicha">' +
-      '<w:name w:val="Texto ficha"/>' +
-      '<w:pPr><w:spacing w:after="180"/><w:jc w:val="both"/></w:pPr>' +
-      '<w:rPr><w:sz w:val="22"/></w:rPr>' +
-      '</w:style>' +
-      '</w:styles>'
+      '<w:pPr><w:spacing w:after="55"/>' +
+      '</w:pPr>' +
+      '<w:rPr><w:sz w:val="20"/>' +
+      '</w:rPr></w:style>' +
+
+      "</w:styles>"
     );
   }
 
@@ -470,7 +423,7 @@ window.Exportacion = (() => {
     for (const byte of datos) {
       crc ^= byte;
 
-      for (let j = 0; j < 8; j++) {
+      for (let i = 0; i < 8; i++) {
         crc = (crc >>> 1) ^
           ((crc & 1) ? 0xEDB88320 : 0);
       }
@@ -480,7 +433,10 @@ window.Exportacion = (() => {
   }
 
   function u16(n) {
-    return [n & 255, (n >>> 8) & 255];
+    return [
+      n & 255,
+      (n >>> 8) & 255
+    ];
   }
 
   function u32(n) {
@@ -494,7 +450,8 @@ window.Exportacion = (() => {
 
   function unir(partes) {
     const total = partes.reduce(
-      (n, p) => n + p.length, 0
+      (n, parte) => n + parte.length,
+      0
     );
 
     const salida = new Uint8Array(total);
@@ -511,6 +468,7 @@ window.Exportacion = (() => {
   function crearZIP(archivos) {
     const locales = [];
     const centrales = [];
+
     let desplazamiento = 0;
 
     for (const [nombre, contenido] of archivos) {
@@ -550,7 +508,6 @@ window.Exportacion = (() => {
         ...u16(0),
         ...u16(0),
         ...u16(0),
-        ...u32(0),
         ...u32(desplazamiento)
       ]);
 
@@ -573,113 +530,358 @@ window.Exportacion = (() => {
       ...u16(0)
     ]);
 
-    return unir([...locales, directorio, final]);
+    return unir([
+      ...locales,
+      directorio,
+      final
+    ]);
   }
 
   function crearDocx(parrafos) {
     const tipos =
       '<?xml version="1.0" encoding="UTF-8"?>' +
-      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-      '<Default Extension="xml" ContentType="application/xml"/>' +
-      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
-      '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+      '<Types xmlns="' +
+      'http://schemas.openxmlformats.org/' +
+      'package/2006/content-types">' +
+      '<Default Extension="rels" ' +
+      'ContentType="application/vnd.openxmlformats-' +
+      'package.relationships+xml"/>' +
+      '<Default Extension="xml" ' +
+      'ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ' +
+      'ContentType="application/vnd.openxmlformats-' +
+      'officedocument.wordprocessingml.document.' +
+      'main+xml"/>' +
+      '<Override PartName="/word/styles.xml" ' +
+      'ContentType="application/vnd.openxmlformats-' +
+      'officedocument.wordprocessingml.styles+xml"/>' +
       '</Types>';
 
-    const relacionesRaiz =
+    const raiz =
       '<?xml version="1.0" encoding="UTF-8"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '<Relationships xmlns="' +
+      'http://schemas.openxmlformats.org/' +
+      'package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="' +
+      'http://schemas.openxmlformats.org/' +
+      'officeDocument/2006/relationships/' +
+      'officeDocument" Target="word/document.xml"/>' +
       '</Relationships>';
 
-    const relacionesWord =
+    const word =
       '<?xml version="1.0" encoding="UTF-8"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '<Relationships xmlns="' +
+      'http://schemas.openxmlformats.org/' +
+      'package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="' +
+      'http://schemas.openxmlformats.org/' +
+      'officeDocument/2006/relationships/styles" ' +
+      'Target="styles.xml"/>' +
       '</Relationships>';
 
     return crearZIP([
       ["[Content_Types].xml", tipos],
-      ["_rels/.rels", relacionesRaiz],
-      ["word/document.xml", documentoXML(parrafos)],
+      ["_rels/.rels", raiz],
+      [
+        "word/document.xml",
+        documentoXML(parrafos)
+      ],
       ["word/styles.xml", estilosXML()],
-      ["word/_rels/document.xml.rels", relacionesWord]
+      [
+        "word/_rels/document.xml.rels",
+        word
+      ]
     ]);
-  }
-
-  function nombreSeguro(s) {
-    return valor(s)
-      .replace(/[\\/:*?"<>|]/g, "_")
-      .replace(/\s+/g, "_")
-      .slice(0, 60) || "Sin_referencia";
   }
 
   async function compartir(archivo) {
     if (
       navigator.canShare &&
       navigator.share &&
-      navigator.canShare({files: [archivo]})
+      navigator.canShare({
+        files: [archivo]
+      })
     ) {
       await navigator.share({
         files: [archivo],
         title: archivo.name
       });
+
       return;
     }
 
-    const url = URL.createObjectURL(archivo);
-    const enlace = document.createElement("a");
+    const url =
+      URL.createObjectURL(archivo);
+
+    const enlace =
+      document.createElement("a");
 
     enlace.href = url;
     enlace.download = archivo.name;
+
     document.body.append(enlace);
     enlace.click();
     enlace.remove();
 
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      60000
+    );
   }
 
-  async function exportar(a, formato = "ficha") {
-    if (!a || typeof a !== "object") {
-      throw Error("No hay actuación para exportar.");
+  function comprobarActuacion(actuacion) {
+    if (
+      !actuacion ||
+      typeof actuacion !== "object" ||
+      Array.isArray(actuacion)
+    ) {
+      throw Error(
+        "No hay una actuación válida."
+      );
     }
 
-    if (!valor(a.referencia)) {
-      throw Error("Falta la referencia de actuación.");
+    if (!valor(actuacion.referencia)) {
+      throw Error(
+        "La actuación necesita una referencia."
+      );
     }
+  }
 
-    if (!["ficha", "diligencia"].includes(formato)) {
-      throw Error("Formato de exportación desconocido.");
-    }
+  async function exportarFicha(actuacion) {
+    comprobarActuacion(actuacion);
 
-    const contenido = formato === "ficha"
-      ? fichaCompacta(a)
-      : textoDiligencia(a);
+    const parrafos =
+      fichaCompacta(actuacion);
 
-    const datos = crearDocx(contenido);
+    const datos = crearDocx(parrafos);
 
-    const nombre = (
-      formato === "ficha"
-        ? "Ficha_"
-        : "Diligencia_"
-    ) + nombreSeguro(a.referencia) + ".docx";
+    const nombre =
+      "Ficha_" +
+      nombreSeguro(actuacion.referencia) +
+      ".docx";
 
     const archivo = new File(
       [datos],
       nombre,
+      {type: MIME_DOCX}
+    );
+
+    await compartir(archivo);
+  }
+
+  function aBase64(datos) {
+    let binario = "";
+
+    for (const byte of datos) {
+      binario += String.fromCharCode(byte);
+    }
+
+    return btoa(binario);
+  }
+
+  function prepararIntercambio(actuacion) {
+    comprobarActuacion(actuacion);
+
+    const copia = structuredClone(actuacion);
+
+    const {
+      personas,
+      vehiculos,
+      objetos
+    } = listas(copia);
+
+    copia.personas = personas;
+    copia.vehiculos = vehiculos;
+    copia.objetos = objetos;
+
+    return {
+      formato: "filiaciones-gestor-policial",
+      versionFormato: 1,
+      fechaExportacion:
+        new Date().toISOString(),
+      origen: "Filiaciones PWA",
+      destinoPrevisto: "Gestor Policial",
+      actuacion: copia
+    };
+  }
+
+  async function cifrarIntercambio(datos, clave) {
+    if (
+      !crypto?.subtle ||
+      !crypto.getRandomValues
+    ) {
+      throw Error(
+        "Este dispositivo no permite " +
+        "realizar la exportación cifrada."
+      );
+    }
+
+    const sal = crypto.getRandomValues(
+      new Uint8Array(16)
+    );
+
+    const iv = crypto.getRandomValues(
+      new Uint8Array(12)
+    );
+
+    const material =
+      await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(clave),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+
+    const iteraciones = 310000;
+
+    const claveAES =
+      await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: sal,
+          iterations: iteraciones,
+          hash: "SHA-256"
+        },
+        material,
+        {
+          name: "AES-GCM",
+          length: 256
+        },
+        false,
+        ["encrypt"]
+      );
+
+    const texto = encoder.encode(
+      JSON.stringify(datos)
+    );
+
+    const cifrado =
+      await crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv
+        },
+        claveAES,
+        texto
+      );
+
+    return {
+      formato:
+        "filiaciones-intercambio-cifrado",
+      version: 1,
+      cifrado: "AES-256-GCM",
+      derivacion: "PBKDF2-SHA256",
+      iteraciones,
+      sal: aBase64(sal),
+      iv: aBase64(iv),
+      datos: aBase64(
+        new Uint8Array(cifrado)
+      )
+    };
+  }
+
+  async function exportarGestorPolicial(
+    actuacion
+  ) {
+    comprobarActuacion(actuacion);
+
+    const primera = prompt(
+      "Contraseña para el archivo de " +
+      "intercambio cifrado.\n\n" +
+      "Debe tener al menos 12 caracteres.\n" +
+      "No tiene que ser la contraseña " +
+      "de Filiaciones."
+    );
+
+    if (primera === null) return;
+
+    if (primera.length < 12) {
+      throw Error(
+        "La contraseña debe tener " +
+        "al menos 12 caracteres."
+      );
+    }
+
+    const segunda = prompt(
+      "Repite la contraseña del " +
+      "archivo de intercambio."
+    );
+
+    if (segunda === null) return;
+
+    if (primera !== segunda) {
+      throw Error(
+        "Las contraseñas no coinciden."
+      );
+    }
+
+    const intercambio =
+      prepararIntercambio(actuacion);
+
+    const protegido =
+      await cifrarIntercambio(
+        intercambio,
+        primera
+      );
+
+    const contenido =
+      JSON.stringify(protegido, null, 2);
+
+    const nombre =
+      "GestorPolicial_" +
+      nombreSeguro(actuacion.referencia) +
+      ".gpenc";
+
+    const archivo = new File(
+      [contenido],
+      nombre,
       {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        type: "application/octet-stream"
       }
     );
 
     await compartir(archivo);
   }
 
+  /*
+   * Compatibilidad con app.js Beta 0.9.9.
+   *
+   * exportar(a, "ficha") mantiene Word.
+   * exportar(a, "diligencia") ya no genera
+   * una diligencia: genera intercambio.
+   *
+   * En el siguiente paso cambiaremos
+   * el texto del botón en app.js.
+   */
+  async function exportar(
+    actuacion,
+    formato = "ficha"
+  ) {
+    if (formato === "ficha") {
+      return exportarFicha(actuacion);
+    }
+
+    if (
+      formato === "gestor" ||
+      formato === "diligencia"
+    ) {
+      return exportarGestorPolicial(
+        actuacion
+      );
+    }
+
+    throw Error(
+      "Formato de exportación desconocido."
+    );
+  }
+
   return {
     exportar,
+    exportarFicha,
+    exportarGestorPolicial,
     fichaCompacta,
-    textoDiligencia,
-    textoActuacion
+    prepararIntercambio
   };
 
 })();
