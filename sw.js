@@ -1,14 +1,13 @@
 
-
 /*
- * Filiaciones Beta 0.8.1
- * Caché de archivos de aplicación.
+ * Filiaciones Beta 0.9.3
+ * Caché de aplicación con restauración.
  *
- * No almacena actuaciones en Cache Storage.
- * Las actuaciones permanecen en IndexedDB.
+ * Las actuaciones no se guardan en
+ * Cache Storage, sino en IndexedDB.
  */
 
-const CACHE = "filiaciones-app-v081";
+const CACHE = "filiaciones-app-v093";
 
 const ARCHIVOS = [
   "./",
@@ -17,7 +16,9 @@ const ARCHIVOS = [
   "./almacenamiento.js",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
-  "./boton-copias.js?v=081"
+  "./boton-copias.js?v=081",
+  "./restauracion.js?v=092",
+  "./pantalla-restauracion.js?v=093"
 ];
 
 self.addEventListener("install", event => {
@@ -54,15 +55,21 @@ self.addEventListener("fetch", event => {
 
   const url = new URL(req.url);
 
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
-  const esNavegacion = req.mode === "navigate";
+  const esNavegacion =
+    req.mode === "navigate";
 
-  const esArchivo = /\/(?:index\.html|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js)$/.test(
-    url.pathname
-  );
+  const esArchivo =
+    /\/(?:index\.html|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js|restauracion\.js|pantalla-restauracion\.js)$/.test(
+      url.pathname
+    );
 
-  if (!esNavegacion && !esArchivo) return;
+  if (!esNavegacion && !esArchivo) {
+    return;
+  }
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
