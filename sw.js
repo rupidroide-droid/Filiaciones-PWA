@@ -1,45 +1,26 @@
 
 /*
- * FILIACIONES
- * Service Worker
- * Beta 0.9.10
+ * FILIACIONES PWA
+ * Service Worker - Beta 0.9.11
  *
- * Gestiona la caché de los archivos
- * necesarios para el funcionamiento
- * sin conexión.
- *
- * No modifica ni elimina actuaciones
- * del almacenamiento cifrado.
+ * Actualización de recursos offline.
+ * No elimina actuaciones ni bases de datos.
  */
 
-"use strict";
-
-const CACHE = "filiaciones-app-v0910";
+const CACHE = "filiaciones-app-v0911";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
-
   "./almacenamiento.js",
-
-  "./exportacion.js?v=0910",
-  "./app.js?v=0910",
-
+  "./exportacion.js?v=0911",
+  "./app.js?v=0911",
   "./seguridad.js?v=071",
-
   "./copias.js?v=080",
   "./boton-copias.js?v=081",
-
   "./restauracion.js?v=095",
   "./pantalla-restauracion.js?v=094"
 ];
-
-/*
- * INSTALACIÓN
- *
- * Guarda los archivos de la aplicación
- * para que puedan utilizarse sin conexión.
- */
 
 self.addEventListener("install", evento => {
   evento.waitUntil(
@@ -49,22 +30,11 @@ self.addEventListener("install", evento => {
   );
 });
 
-/*
- * ACTIVACIÓN
- *
- * Elimina únicamente las cachés antiguas
- * cuyo nombre comience por
- * "filiaciones-app-".
- *
- * No accede a IndexedDB ni a los datos
- * cifrados de las actuaciones.
- */
-
 self.addEventListener("activate", evento => {
   evento.waitUntil(
     caches.keys()
-      .then(nombres => {
-        return Promise.all(
+      .then(nombres =>
+        Promise.all(
           nombres
             .filter(nombre =>
               nombre.startsWith(
@@ -75,23 +45,11 @@ self.addEventListener("activate", evento => {
             .map(nombre =>
               caches.delete(nombre)
             )
-        );
-      })
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
-
-/*
- * PETICIONES
- *
- * Navegación:
- * intenta primero la red.
- * Si no hay conexión, utiliza
- * la página almacenada.
- *
- * Archivos estáticos:
- * utiliza primero la caché.
- */
 
 self.addEventListener("fetch", evento => {
   const peticion = evento.request;
@@ -113,29 +71,20 @@ self.addEventListener("fetch", evento => {
           if (respuesta.ok) {
             const copia = respuesta.clone();
 
-            evento.waitUntil(
-              caches.open(CACHE)
-                .then(cache =>
-                  cache.put(
-                    "./index.html",
-                    copia
-                  )
+            caches.open(CACHE)
+              .then(cache =>
+                cache.put(
+                  "./index.html",
+                  copia
                 )
-            );
+              );
           }
 
           return respuesta;
         })
-        .catch(async () => {
-          const cache =
-            await caches.open(CACHE);
-
-          return (
-            await cache.match(
-              "./index.html"
-            )
-          ) || Response.error();
-        })
+        .catch(() =>
+          caches.match("./index.html")
+        )
     );
 
     return;
@@ -143,12 +92,30 @@ self.addEventListener("fetch", evento => {
 
   evento.respondWith(
     caches.match(peticion)
-      .then(respuestaGuardada => {
-        if (respuestaGuardada) {
-          return respuestaGuardada;
+      .then(guardado => {
+        if (guardado) {
+          return guardado;
         }
 
-        return fetch(peticion);
+        return fetch(peticion)
+          .then(respuesta => {
+            if (
+              respuesta.ok &&
+              respuesta.type === "basic"
+            ) {
+              const copia = respuesta.clone();
+
+              caches.open(CACHE)
+                .then(cache =>
+                  cache.put(
+                    peticion,
+                    copia
+                  )
+                );
+            }
+
+            return respuesta;
+          });
       })
   );
 });
