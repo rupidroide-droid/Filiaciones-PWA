@@ -1,10 +1,14 @@
 
 /*
- * FILIACIONES BETA 0.9.9
+ * FILIACIONES BETA 0.9.10
  *
+ * Recogida local de datos.
  * Personas, vehículos y objetos.
  * Vinculaciones múltiples.
- * Exportación de ficha y diligencia Word.
+ *
+ * Exportaciones:
+ * - Ficha Word
+ * - Intercambio cifrado para Gestor Policial
  *
  * PROTOTIPO: SOLO DATOS FICTICIOS.
  */
@@ -73,24 +77,24 @@ function limpiar() {
   principal().replaceChildren();
 }
 
-function titulo(t) {
+function titulo(texto) {
   const h = document.createElement("h2");
-  h.textContent = t;
+  h.textContent = texto;
   principal().append(h);
 }
 
-function aviso(t, destino = principal()) {
+function aviso(texto, destino = principal()) {
   const p = document.createElement("p");
-  p.textContent = t;
+  p.textContent = texto;
   destino.append(p);
   return p;
 }
 
-function boton(t, fn, destino = principal()) {
+function boton(texto, funcion, destino = principal()) {
   const b = document.createElement("button");
   b.type = "button";
-  b.textContent = t;
-  b.addEventListener("click", fn);
+  b.textContent = texto;
+  b.addEventListener("click", funcion);
   destino.append(b);
   return b;
 }
@@ -340,11 +344,7 @@ function abrirVehiculo(indice) {
   }
 }
 
-function vinculaciones(
-  vehiculo,
-  indice,
-  destino
-) {
+function vinculaciones(vehiculo, indice, destino) {
   const caja = document.createElement("div");
 
   caja.style.cssText =
@@ -357,72 +357,59 @@ function vinculaciones(
 
   if (!actuacion.personas.length) {
     aviso(
-      "Añade primero una persona " +
-      "para vincularla.",
+      "Añade primero una persona para vincularla.",
       caja
     );
   }
 
-  vehiculo.vinculos.forEach(
-    (relacion, j) => {
-      const persona = actuacion.personas.find(
-        p =>
-          p.idPersona === relacion.personaId
-      );
+  vehiculo.vinculos.forEach((relacion, j) => {
+    const persona = actuacion.personas.find(
+      p => p.idPersona === relacion.personaId
+    );
 
-      if (!persona) return;
+    if (!persona) return;
 
-      const fila = document.createElement("div");
+    const fila = document.createElement("div");
 
-      fila.style.cssText =
-        "border:1px solid #ddd;" +
-        "border-radius:8px;" +
-        "padding:10px;margin:8px 0";
+    fila.style.cssText =
+      "border:1px solid #ddd;" +
+      "border-radius:8px;" +
+      "padding:10px;margin:8px 0";
 
-      aviso(
-        (
-          persona.nombre ||
-          "Persona " +
-          (
-            actuacion.personas.indexOf(persona) +
-            1
-          )
-        ) +
-        " — " +
-        relacion.rol,
-        fila
-      );
+    aviso(
+      (
+        persona.nombre ||
+        "Persona " +
+        (actuacion.personas.indexOf(persona) + 1)
+      ) +
+      " — " +
+      relacion.rol,
+      fila
+    );
 
-      boton(
-        "Quitar vinculación",
-        () => {
-          leer();
+    boton(
+      "Quitar vinculación",
+      () => {
+        leer();
+        vehiculo.vinculos.splice(j, 1);
+        cambiosPendientes = true;
+        dibujar();
+        abrirVehiculo(indice);
+      },
+      fila
+    );
 
-          vehiculo.vinculos.splice(j, 1);
-          cambiosPendientes = true;
-
-          dibujar();
-          abrirVehiculo(indice);
-        },
-        fila
-      );
-
-      caja.append(fila);
-    }
-  );
+    caja.append(fila);
+  });
 
   if (actuacion.personas.length) {
-    const disponibles =
-      actuacion.personas.map(
-        (persona, i) => [
-          persona.idPersona,
-          (i + 1) + ". " +
-          (
-            persona.nombre ||
-            "Sin nombre"
-          )
-        ]
-      );
+    const disponibles = actuacion.personas.map(
+      (persona, i) => [
+        persona.idPersona,
+        (i + 1) + ". " +
+        (persona.nombre || "Sin nombre")
+      ]
+    );
 
     const selectorPersona = selector(
       disponibles,
@@ -434,29 +421,22 @@ function vinculaciones(
       roles[0]
     );
 
-    caja.append(
-      selectorPersona,
-      selectorRol
-    );
+    caja.append(selectorPersona, selectorRol);
 
     boton(
       "+ Vincular persona",
       () => {
         leer();
 
-        const existe =
-          vehiculo.vinculos.some(
-            relacion =>
-              relacion.personaId ===
-                selectorPersona.value &&
-              relacion.rol ===
-                selectorRol.value
-          );
+        const existe = vehiculo.vinculos.some(
+          relacion =>
+            relacion.personaId ===
+              selectorPersona.value &&
+            relacion.rol === selectorRol.value
+        );
 
         if (existe) {
-          alert(
-            "Esta vinculación ya existe."
-          );
+          alert("Esta vinculación ya existe.");
           return;
         }
 
@@ -466,7 +446,6 @@ function vinculaciones(
         });
 
         cambiosPendientes = true;
-
         dibujar();
         abrirVehiculo(indice);
       },
@@ -489,13 +468,10 @@ function ficha(tipo, registro, indice) {
     "color:#17253c"
   ].join(";");
 
-  const encabezado =
-    document.createElement("summary");
+  const encabezado = document.createElement("summary");
 
   encabezado.textContent =
-    nombres[tipo] +
-    " " +
-    (indice + 1);
+    nombres[tipo] + " " + (indice + 1);
 
   encabezado.style.cssText =
     "font-weight:700;" +
@@ -504,10 +480,7 @@ function ficha(tipo, registro, indice) {
 
   d.append(encabezado);
 
-  for (
-    const [nombre, etiqueta]
-    of esquemas[tipo]
-  ) {
+  for (const [nombre, etiqueta] of esquemas[tipo]) {
     d.append(
       campo(
         etiqueta,
@@ -520,18 +493,13 @@ function ficha(tipo, registro, indice) {
   }
 
   if (tipo === "vehiculos") {
-    vinculaciones(
-      registro,
-      indice,
-      d
-    );
+    vinculaciones(registro, indice, d);
   }
 
   boton(
     "Eliminar " +
     nombres[tipo].toLowerCase() +
-    " " +
-    (indice + 1),
+    " " + (indice + 1),
     () => {
       leer();
 
@@ -552,8 +520,7 @@ function ficha(tipo, registro, indice) {
       const mensaje =
         "¿Eliminar " +
         nombres[tipo].toLowerCase() +
-        " " +
-        (indice + 1) +
+        " " + (indice + 1) +
         " de esta actuación?" +
         (
           afectados
@@ -562,17 +529,13 @@ function ficha(tipo, registro, indice) {
               " vinculaciones con vehículos."
             : ""
         ) +
-        "\n\nEl cambio se guardará " +
-        "cuando pulses Guardar " +
-        "actuación cifrada.";
+        "\n\nEl cambio se guardará cuando " +
+        "pulses Guardar actuación cifrada.";
 
       if (!confirm(mensaje)) return;
 
       if (tipo === "personas") {
-        for (
-          const vehiculo
-          of actuacion.vehiculos
-        ) {
+        for (const vehiculo of actuacion.vehiculos) {
           vehiculo.vinculos =
             vehiculo.vinculos.filter(
               relacion =>
@@ -583,7 +546,6 @@ function ficha(tipo, registro, indice) {
       }
 
       actuacion[tipo].splice(indice, 1);
-
       cambiosPendientes = true;
       dibujar();
     },
@@ -607,32 +569,22 @@ function seccion(tipo) {
   h.textContent =
     tipo.charAt(0).toUpperCase() +
     tipo.slice(1) +
-    " (" +
-    actuacion[tipo].length +
-    ")";
+    " (" + actuacion[tipo].length + ")";
 
   s.append(h);
 
-  actuacion[tipo].forEach(
-    (registro, indice) => {
-      s.append(
-        ficha(tipo, registro, indice)
-      );
-    }
-  );
+  actuacion[tipo].forEach((registro, indice) => {
+    s.append(ficha(tipo, registro, indice));
+  });
 
   boton(
-    "+ Añadir " +
-    nombres[tipo].toLowerCase(),
+    "+ Añadir " + nombres[tipo].toLowerCase(),
     () => {
       leer();
 
       const nuevo = {};
 
-      for (
-        const [nombre]
-        of esquemas[tipo]
-      ) {
+      for (const [nombre] of esquemas[tipo]) {
         nuevo[nombre] = "";
       }
 
@@ -645,21 +597,15 @@ function seccion(tipo) {
       }
 
       actuacion[tipo].push(nuevo);
-
       cambiosPendientes = true;
       dibujar();
 
-      const seccionActual =
-        principal().querySelector(
-          'section[data-tipo="' +
-          tipo +
-          '"]'
-        );
+      const seccionActual = principal().querySelector(
+        'section[data-tipo="' + tipo + '"]'
+      );
 
       const ultima = Array.from(
-        seccionActual.querySelectorAll(
-          "details"
-        )
+        seccionActual.querySelectorAll("details")
       ).at(-1);
 
       if (ultima) {
@@ -677,50 +623,27 @@ function seccion(tipo) {
 }
 
 function dibujar() {
-  if (
-    !comprobarAcceso() ||
-    !actuacion
-  ) {
-    return;
-  }
+  if (!comprobarAcceso() || !actuacion) return;
 
   limpiar();
   titulo("Ficha de actuación");
 
   aviso(
     actuacion.id
-      ? "Actuación guardada. " +
-        "Puedes modificarla."
-      : "Nueva actuación. " +
-        "Pendiente de guardar."
+      ? "Actuación guardada. Puedes modificarla."
+      : "Nueva actuación. Pendiente de guardar."
   );
 
-  for (
-    const [nombre, etiqueta]
-    of [
-      [
-        "referencia",
-        "Referencia de actuación"
-      ],
-      [
-        "numeroAtestado",
-        "Número de atestado (si existe)"
-      ],
-      ["fecha", "Fecha"],
-      ["hora", "Hora"],
-      ["lugar", "Lugar"],
-      [
-        "agentes",
-        "Agentes intervinientes"
-      ]
-    ]
-  ) {
+  for (const [nombre, etiqueta] of [
+    ["referencia", "Referencia de actuación"],
+    ["numeroAtestado", "Número de atestado (si existe)"],
+    ["fecha", "Fecha"],
+    ["hora", "Hora"],
+    ["lugar", "Lugar"],
+    ["agentes", "Agentes intervinientes"]
+  ]) {
     principal().append(
-      campo(
-        etiqueta,
-        nombre,
-        actuacion[nombre]
-      )
+      campo(etiqueta, nombre, actuacion[nombre])
     );
   }
 
@@ -734,13 +657,13 @@ function dibujar() {
   );
 
   boton(
-    "Exportar ficha de filiación (.docx)",
+    "Exportar ficha de filiación Word (.docx)",
     () => exportarWord("ficha")
   );
 
   boton(
-    "Exportar texto para diligencia (.docx)",
-    () => exportarWord("diligencia")
+    "Exportar para Gestor Policial (cifrado)",
+    () => exportarWord("gestor")
   );
 
   boton("Ver resumen", resumen);
@@ -748,55 +671,41 @@ function dibujar() {
   boton(
     "Volver al menú",
     () => {
-      if (confirmarSalida()) {
-        menu();
-      }
+      if (confirmarSalida()) menu();
     }
   );
 
   boton(
     "Bloquear aplicación",
     () => {
-      if (confirmarSalida()) {
-        bloquear();
-      }
+      if (confirmarSalida()) bloquear();
     }
   );
 
   aviso(
     "PROTOTIPO: solo datos ficticios. " +
-    "No apto para información policial real."
+    "La importación en Gestor Policial " +
+    "todavía no está implementada."
   );
 }
 
-async function exportarWord(
-  formato = "ficha"
-) {
-  if (
-    !comprobarAcceso() ||
-    !actuacion
-  ) {
-    return;
-  }
+async function exportarWord(formato = "ficha") {
+  if (!comprobarAcceso() || !actuacion) return;
 
   try {
     if (!window.Exportacion?.exportar) {
       throw Error(
-        "El módulo de exportación " +
-        "no está cargado."
+        "El módulo de exportación no está cargado."
       );
     }
 
     leer();
 
     if (
-      !String(
-        actuacion.referencia || ""
-      ).trim()
+      !String(actuacion.referencia || "").trim()
     ) {
       throw Error(
-        "Introduce una referencia " +
-        "para exportar."
+        "Introduce una referencia para exportar."
       );
     }
 
@@ -804,9 +713,8 @@ async function exportarWord(
       comprobarCambios() &&
       !confirm(
         "Hay cambios sin guardar.\n\n" +
-        "El documento incluirá los " +
-        "datos actuales, aunque no " +
-        "estén guardados.\n\n" +
+        "La exportación incluirá los datos " +
+        "actuales, aunque no estén guardados.\n\n" +
         "¿Continuar?"
       )
     ) {
@@ -819,50 +727,36 @@ async function exportarWord(
     );
 
   } catch (e) {
-    if (
-      e?.name !== "AbortError"
-    ) {
+    if (e?.name !== "AbortError") {
       error(e);
     }
   }
 }
 
 async function guardarActual() {
-  if (
-    !comprobarAcceso() ||
-    !actuacion
-  ) {
-    return;
-  }
+  if (!comprobarAcceso() || !actuacion) return;
 
   try {
     leer();
 
     if (
-      !String(
-        actuacion.referencia || ""
-      ).trim()
+      !String(actuacion.referencia || "").trim()
     ) {
       throw Error(
-        "Introduce una referencia " +
-        "para la actuación."
+        "Introduce una referencia para la actuación."
       );
     }
 
-    const id =
-      await Almacenamiento.guardar(
-        actuacion
-      );
+    const id = await Almacenamiento.guardar(
+      actuacion
+    );
 
     marcarGuardado();
 
     alert(
-      "Actuación guardada " +
-      "correctamente.\n\n" +
-      "Referencia: " +
-      actuacion.referencia +
-      "\nID: " +
-      id
+      "Actuación guardada correctamente.\n\n" +
+      "Referencia: " + actuacion.referencia +
+      "\nID: " + id
     );
 
     dibujar();
@@ -877,10 +771,7 @@ function resumen() {
 
   leer();
 
-  let p =
-    document.getElementById(
-      "resumen"
-    );
+  let p = document.getElementById("resumen");
 
   if (!p) {
     p = document.createElement("pre");
@@ -898,12 +789,11 @@ function resumen() {
     principal().append(p);
   }
 
-  p.textContent =
-    JSON.stringify(
-      actuacion,
-      null,
-      2
-    );
+  p.textContent = JSON.stringify(
+    actuacion,
+    null,
+    2
+  );
 
   p.scrollIntoView({
     behavior: "smooth",
@@ -925,19 +815,15 @@ async function acceso() {
   titulo("Acceso a Filiaciones");
 
   try {
-    const existe =
-      await Almacenamiento.existe();
+    const existe = await Almacenamiento.existe();
 
-    const p =
-      document.createElement("input");
-
+    const p = document.createElement("input");
     p.type = "password";
     p.autocomplete = "off";
 
     p.placeholder = existe
       ? "Contraseña general"
-      : "Nueva contraseña " +
-        "(mínimo 12 caracteres)";
+      : "Nueva contraseña (mínimo 12 caracteres)";
 
     p.style.cssText =
       "display:block;" +
@@ -952,24 +838,16 @@ async function acceso() {
     let confirmar = null;
 
     if (!existe) {
-      confirmar =
-        document.createElement("input");
-
+      confirmar = document.createElement("input");
       confirmar.type = "password";
       confirmar.autocomplete = "off";
-      confirmar.placeholder =
-        "Repite la contraseña";
-
-      confirmar.style.cssText =
-        p.style.cssText;
-
+      confirmar.placeholder = "Repite la contraseña";
+      confirmar.style.cssText = p.style.cssText;
       principal().append(confirmar);
     }
 
     boton(
-      existe
-        ? "Desbloquear"
-        : "Crear contraseña",
+      existe ? "Desbloquear" : "Crear contraseña",
       async () => {
         try {
           if (existe) {
@@ -977,13 +855,9 @@ async function acceso() {
               p.value
             );
           } else {
-            if (
-              p.value !==
-              confirmar.value
-            ) {
+            if (p.value !== confirmar.value) {
               throw Error(
-                "Las contraseñas " +
-                "no coinciden."
+                "Las contraseñas no coinciden."
               );
             }
 
@@ -1017,9 +891,7 @@ async function acceso() {
 }
 
 function menu() {
-  if (
-    !Almacenamiento.desbloqueado()
-  ) {
+  if (!Almacenamiento.desbloqueado()) {
     return acceso();
   }
 
@@ -1029,24 +901,16 @@ function menu() {
 
   limpiar();
 
-  titulo(
-    "Filiaciones — acceso desbloqueado"
-  );
+  titulo("Filiaciones — acceso desbloqueado");
 
-  boton(
-    "Nueva actuación",
-    nuevaActuacion
-  );
+  boton("Nueva actuación", nuevaActuacion);
 
   boton(
     "Consultar actuaciones guardadas",
     consultar
   );
 
-  boton(
-    "Bloquear aplicación",
-    bloquear
-  );
+  boton("Bloquear aplicación", bloquear);
 
   aviso(
     "Prototipo: no verificado para " +
@@ -1064,24 +928,18 @@ async function consultar() {
   titulo("Actuaciones guardadas");
 
   try {
-    const lista =
-      await Almacenamiento.listar();
+    const lista = await Almacenamiento.listar();
 
-    if (
-      !Almacenamiento.desbloqueado()
-    ) {
+    if (!Almacenamiento.desbloqueado()) {
       return acceso();
     }
 
     if (!lista.length) {
-      aviso(
-        "No hay actuaciones guardadas."
-      );
+      aviso("No hay actuaciones guardadas.");
     }
 
     for (const registro of lista) {
-      const s =
-        document.createElement("section");
+      const s = document.createElement("section");
 
       s.style.cssText =
         "padding:12px;" +
@@ -1091,23 +949,16 @@ async function consultar() {
 
       aviso(
         "Referencia: " +
-        (
-          registro.referencia ||
-          "(sin referencia)"
-        ) +
+        (registro.referencia || "(sin referencia)") +
         " — " +
-        (
-          registro.fecha || ""
-        ),
+        (registro.fecha || ""),
         s
       );
 
       boton(
         "Abrir y editar",
         () => {
-          actuacion =
-            normalizar(registro);
-
+          actuacion = normalizar(registro);
           marcarGuardado();
           dibujar();
         },
@@ -1119,11 +970,10 @@ async function consultar() {
         async () => {
           if (
             !confirm(
-              "¿Eliminar definitivamente " +
-              "esta actuación de prueba?\n\n" +
-              "Esta operación no se puede " +
-              "deshacer sin una copia " +
-              "de seguridad."
+              "¿Eliminar definitivamente esta " +
+              "actuación de prueba?\n\n" +
+              "Esta operación no se puede deshacer " +
+              "sin una copia de seguridad."
             )
           ) {
             return;
@@ -1150,34 +1000,20 @@ async function consultar() {
     error(e);
   }
 
-  boton(
-    "Volver al menú",
-    menu
-  );
-
-  boton(
-    "Bloquear aplicación",
-    bloquear
-  );
+  boton("Volver al menú", menu);
+  boton("Bloquear aplicación", bloquear);
 }
 
 window.mostrar = function(nombre) {
-  if (
-    !Almacenamiento.desbloqueado()
-  ) {
+  if (!Almacenamiento.desbloqueado()) {
     return acceso();
   }
 
-  if (
-    actuacion &&
-    !confirmarSalida()
-  ) {
+  if (actuacion && !confirmarSalida()) {
     return;
   }
 
-  if (
-    nombre === "Nueva actuación"
-  ) {
+  if (nombre === "Nueva actuación") {
     nuevaActuacion();
 
   } else if (
@@ -1186,16 +1022,11 @@ window.mostrar = function(nombre) {
     consultar();
 
   } else {
-    alert(
-      nombre +
-      ": módulo pendiente."
-    );
+    alert(nombre + ": módulo pendiente.");
   }
 };
 
-if (
-  document.readyState === "loading"
-) {
+if (document.readyState === "loading") {
   document.addEventListener(
     "DOMContentLoaded",
     acceso
