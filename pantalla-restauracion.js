@@ -3,25 +3,45 @@
 
 /*
  * FILIACIONES - PANTALLA DE RESTAURACIÓN
- * Beta 0.9.3
+ * Beta 0.9.4
+ *
+ * Observador controlado.
+ * Diagnóstico visible.
+ * Importación con confirmación.
  */
 
 (() => {
   let panel = null;
   let preparado = false;
+  let ocupado = false;
+  let programado = false;
 
-  function crearElemento(tipo, texto) {
+  function elemento(tipo, texto = "") {
     const el = document.createElement(tipo);
     if (texto) el.textContent = texto;
     return el;
   }
 
-  function crearPantalla() {
-    if (panel) return panel;
+  function desbloqueada() {
+    return (
+      typeof Almacenamiento !== "undefined" &&
+      Almacenamiento.desbloqueado()
+    );
+  }
 
-    panel = crearElemento("section");
-    panel.id = "panel-restauracion";
-    panel.style.cssText = `
+  function descartar() {
+    preparado = false;
+
+    if (typeof Restauracion !== "undefined") {
+      Restauracion.descartar();
+    }
+  }
+
+  function crearPantalla() {
+    const seccion = elemento("section");
+    seccion.id = "panel-restauracion";
+
+    seccion.style.cssText = `
       padding:16px;
       margin:16px 0;
       border:1px solid #999;
@@ -30,23 +50,23 @@
       color:#222;
     `;
 
-    const titulo = crearElemento(
+    const titulo = elemento(
       "h2",
       "Restaurar actuaciones"
     );
 
-    const explicacion = crearElemento(
+    const descripcion = elemento(
       "p",
       "Selecciona una copia cifrada. " +
       "Las actuaciones existentes no se sobrescribirán."
     );
 
-    const archivo = crearElemento("input");
+    const archivo = elemento("input");
     archivo.type = "file";
     archivo.accept = ".json,application/json";
     archivo.style.width = "100%";
 
-    const password = crearElemento("input");
+    const password = elemento("input");
     password.type = "password";
     password.placeholder = "Contraseña de la copia";
     password.autocomplete = "off";
@@ -57,27 +77,22 @@
       margin:12px 0;
     `;
 
-    const analizar = crearElemento(
+    const analizar = elemento(
       "button",
       "Analizar copia"
     );
 
-    const importar = crearElemento(
+    const importar = elemento(
       "button",
       "Confirmar importación"
     );
 
-    importar.disabled = true;
-
-    const cancelar = crearElemento(
+    const cancelar = elemento(
       "button",
       "Cancelar restauración"
     );
 
-    const estado = crearElemento("p");
-    estado.setAttribute("role", "status");
-
-    const listado = crearElemento("ul");
+    importar.disabled = true;
 
     for (const boton of [
       analizar,
@@ -94,45 +109,86 @@
       `;
     }
 
-    function limpiar() {
-      preparado = false;
-      importar.disabled = true;
-      archivo.value = "";
-      password.value = "";
-      listado.replaceChildren();
+    const estado = elemento("p");
+    estado.setAttribute("role", "status");
+    estado.setAttribute("aria-live", "polite");
+    estado.style.cssText = `
+      font-weight:600;
+      white-space:pre-wrap;
+    `;
 
-      if (typeof Restauracion !== "undefined") {
-        Restauracion.descartar();
-      }
+    const listado = elemento("ul");
+
+    function mensaje(texto) {
+      estado.textContent = texto;
     }
 
-    analizar.onclick = async () => {
-      limpiarResultado();
+    function reiniciar() {
+      descartar();
+      importar.disabled = true;
+      listado.replaceChildren();
+    }
+
+    archivo.addEventListener("change", () => {
+      reiniciar();
+
+      if (archivo.files.length) {
+        mensaje(
+          "Archivo seleccionado. " +
+          "Introduce la contraseña y pulsa Analizar copia."
+        );
+      } else {
+        mensaje("No hay archivo seleccionado.");
+      }
+    });
+
+    analizar.addEventListener("click", async () => {
+      if (ocupado) return;
+
+      reiniciar();
+
+      if (!desbloqueada()) {
+        mensaje("Error: aplicación bloqueada.");
+        return;
+      }
+
+      if (!archivo.files.length) {
+        mensaje("Error: selecciona una copia JSON.");
+        return;
+      }
+
+      if (!password.value) {
+        mensaje("Error: introduce la contraseña.");
+        return;
+      }
+
+      ocupado = true;
+      analizar.disabled = true;
+      mensaje("Analizando copia cifrada...");
 
       try {
-        if (!Almacenamiento.desbloqueado()) {
-          throw Error("Desbloquea Filiaciones");
+        if (typeof Restauracion === "undefined") {
+          throw Error(
+            "El módulo de restauración no está cargado"
+          );
         }
-
-        if (!archivo.files.length) {
-          throw Error("Selecciona el JSON");
-        }
-
-        analizar.disabled = true;
-        estado.textContent = "Analizando copia...";
 
         const resultado = await Restauracion.preparar(
           archivo.files[0],
           password.value
         );
 
-        password.value = "";
+        if (!desbloqueada()) {
+          throw Error(
+            "La aplicación se ha bloqueado durante el análisis"
+          );
+        }
 
         let nuevas = 0;
         let duplicadas = 0;
 
         for (const item of resultado) {
-          const li = crearElemento("li");
+          const li = elemento("li");
 
           li.textContent =
             item.referencia +
@@ -149,74 +205,108 @@
           }
         }
 
-        estado.textContent =
-          `Nuevas: ${nuevas}. ` +
-          `Duplicadas: ${duplicadas}.`;
-
         preparado = nuevas > 0;
         importar.disabled = !preparado;
 
-      } catch (error) {
-        estado.textContent =
-          "Error: " + error.message;
+        mensaje(
+          "Análisis completado.\n" +
+          "Nuevas: " + nuevas + ".\n" +
+          "Duplicadas: " + duplicadas + "."
+        );
 
-        Restauracion.descartar();
+        if (!preparado) {
+          mensaje(
+            estado.textContent +
+            "\nNo hay actuaciones nuevas para importar."
+          );
+        }
+
+      } catch (error) {
+        reiniciar();
+
+        mensaje(
+          "Error al analizar:\n" +
+          (error?.message || String(error))
+        );
+
       } finally {
         password.value = "";
+        ocupado = false;
         analizar.disabled = false;
       }
-    };
+    });
 
-    function limpiarResultado() {
-      preparado = false;
-      importar.disabled = true;
-      listado.replaceChildren();
-      estado.textContent = "";
-      Restauracion.descartar();
-    }
+    importar.addEventListener("click", async () => {
+      if (!preparado || ocupado) return;
 
-    importar.onclick = async () => {
-      if (!preparado) return;
+      if (!desbloqueada()) {
+        reiniciar();
+        mensaje("Desbloquea Filiaciones nuevamente.");
+        return;
+      }
 
-      const aceptado = window.confirm(
-        "¿Confirmas que deseas incorporar " +
-        "las actuaciones nuevas? " +
-        "No se sobrescribirán las existentes."
+      const confirmado = window.confirm(
+        "¿Confirmas la incorporación de las " +
+        "actuaciones nuevas?\n\n" +
+        "Las existentes no se sobrescribirán."
       );
 
-      if (!aceptado) return;
+      if (!confirmado) return;
 
+      ocupado = true;
       importar.disabled = true;
+      analizar.disabled = true;
+
+      mensaje("Importando actuaciones...");
 
       try {
         const resultado =
           await Restauracion.importar(true);
 
-        estado.textContent =
-          `Importadas: ${resultado.importadas}. ` +
-          `Duplicadas: ${resultado.duplicadas}. ` +
-          `Errores: ${resultado.errores}. ` +
-          "Vuelve a consultar las actuaciones.";
-
         preparado = false;
         listado.replaceChildren();
         archivo.value = "";
 
+        mensaje(
+          "Importación finalizada.\n" +
+          "Importadas: " + resultado.importadas + ".\n" +
+          "Duplicadas: " + resultado.duplicadas + ".\n" +
+          "Errores: " + resultado.errores + ".\n" +
+          "Consulta las actuaciones guardadas."
+        );
+
       } catch (error) {
-        estado.textContent =
-          "Error: " + error.message;
+        reiniciar();
+
+        mensaje(
+          "Error de importación:\n" +
+          (error?.message || String(error))
+        );
+
+      } finally {
+        ocupado = false;
+        analizar.disabled = false;
       }
-    };
+    });
 
-    cancelar.onclick = () => {
-      limpiar();
-      estado.textContent =
-        "Restauración cancelada.";
-    };
+    cancelar.addEventListener("click", () => {
+      if (ocupado) {
+        mensaje(
+          "Espera a que termine la operación."
+        );
+        return;
+      }
 
-    panel.append(
+      reiniciar();
+      archivo.value = "";
+      password.value = "";
+
+      mensaje("Restauración cancelada.");
+    });
+
+    seccion.append(
       titulo,
-      explicacion,
+      descripcion,
       archivo,
       password,
       analizar,
@@ -226,48 +316,75 @@
       listado
     );
 
-    return panel;
+    return seccion;
   }
 
   function actualizar() {
+    programado = false;
+
     const main = document.querySelector("main");
 
     if (!main) return;
 
-    const desbloqueada =
-      typeof Almacenamiento !== "undefined" &&
-      Almacenamiento.desbloqueado();
+    if (!desbloqueada()) {
+      descartar();
 
-    const existente = document.getElementById(
-      "panel-restauracion"
-    );
-
-    if (!desbloqueada) {
-      if (existente) existente.remove();
-
-      if (
-        typeof Restauracion !== "undefined"
-      ) {
-        Restauracion.descartar();
+      if (panel?.isConnected) {
+        panel.remove();
       }
 
-      preparado = false;
       panel = null;
       return;
     }
 
-    if (!existente) {
-      panel = null;
-      main.appendChild(crearPantalla());
+    if (
+      !panel ||
+      !panel.isConnected ||
+      !main.contains(panel)
+    ) {
+      descartar();
+      panel = crearPantalla();
+      main.appendChild(panel);
     }
   }
 
-  const observador = new MutationObserver(
-    actualizar
-  );
+  function programarActualizacion() {
+    if (programado) return;
+
+    programado = true;
+
+    queueMicrotask(actualizar);
+  }
 
   function iniciar() {
-    if (!document.body) return;
+    const main = document.querySelector("main");
+
+    if (!main) return;
+
+    const observador = new MutationObserver(
+      mutaciones => {
+        const cambioEstructural = mutaciones.some(
+          m => Array.from(m.addedNodes)
+            .concat(Array.from(m.removedNodes))
+            .some(n =>
+              n === panel ||
+              n.nodeType === Node.ELEMENT_NODE &&
+              (
+                n.matches?.("main") ||
+                n.contains?.(panel)
+              )
+            )
+        );
+
+        if (
+          cambioEstructural ||
+          !panel ||
+          !panel.isConnected
+        ) {
+          programarActualizacion();
+        }
+      }
+    );
 
     observador.observe(
       document.body,
