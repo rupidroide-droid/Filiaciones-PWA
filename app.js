@@ -1,7 +1,7 @@
 
 /*
- * FILIACIONES BETA 0.9.6
- * Formulario de actuaciones mejorado.
+ * FILIACIONES BETA 0.9.7
+ * Formulario de actuaciones y exportación a Word.
  * SOLO DATOS FICTICIOS.
  */
 "use strict";
@@ -408,6 +408,8 @@ function dibujar() {
 
   boton("Guardar actuación cifrada", guardarActual);
 
+  boton("Exportar a Word (.docx)", exportarWord);
+
   boton("Ver resumen", resumen);
 
   boton("Volver al menú", () => {
@@ -426,6 +428,46 @@ function dibujar() {
     "PROTOTIPO: solo datos ficticios. " +
     "No apto para información policial real."
   );
+}
+
+async function exportarWord() {
+  if (!comprobarAcceso() || !actuacion) return;
+
+  try {
+    if (!window.Exportacion?.exportar) {
+      throw Error(
+        "El módulo de exportación no está cargado."
+      );
+    }
+
+    leer();
+
+    if (!actuacion.referencia.trim()) {
+      throw Error(
+        "Introduce una referencia para exportar."
+      );
+    }
+
+    if (comprobarCambios()) {
+      const continuar = confirm(
+        "Hay cambios sin guardar.\n\n" +
+        "El documento incluirá los datos actuales " +
+        "del formulario, aunque todavía no se hayan " +
+        "guardado en la actuación cifrada.\n\n" +
+        "¿Quieres continuar?"
+      );
+
+      if (!continuar) return;
+    }
+
+    await window.Exportacion.exportar(
+      structuredClone(actuacion)
+    );
+
+  } catch (e) {
+    if (e?.name === "AbortError") return;
+    error(e);
+  }
 }
 
 async function guardarActual() {
