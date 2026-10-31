@@ -1,13 +1,16 @@
 
 /*
- * Filiaciones Beta 0.9.3
- * Caché de aplicación con restauración.
+ * FILIACIONES - SERVICE WORKER
+ * Beta 0.9.5
  *
- * Las actuaciones no se guardan en
- * Cache Storage, sino en IndexedDB.
+ * Caché de aplicación con restauración
+ * y diagnóstico de errores.
+ *
+ * Los registros cifrados se almacenan
+ * en IndexedDB, no en Cache Storage.
  */
 
-const CACHE = "filiaciones-app-v093";
+const CACHE = "filiaciones-app-v095";
 
 const ARCHIVOS = [
   "./",
@@ -17,8 +20,8 @@ const ARCHIVOS = [
   "./seguridad.js?v=071",
   "./copias.js?v=080",
   "./boton-copias.js?v=081",
-  "./restauracion.js?v=092",
-  "./pantalla-restauracion.js?v=093"
+  "./restauracion.js?v=095",
+  "./pantalla-restauracion.js?v=094"
 ];
 
 self.addEventListener("install", event => {
