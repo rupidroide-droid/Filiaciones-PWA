@@ -1,110 +1,154 @@
 
 /*
- * FILIACIONES - SERVICE WORKER
- * Beta 0.9.9
+ * FILIACIONES
+ * Service Worker
+ * Beta 0.9.10
  *
- * Dos formatos de exportación Word:
- * - Ficha de filiación
- * - Texto para diligencia
+ * Gestiona la caché de los archivos
+ * necesarios para el funcionamiento
+ * sin conexión.
  *
- * Las actuaciones cifradas permanecen
- * en IndexedDB, no en Cache Storage.
+ * No modifica ni elimina actuaciones
+ * del almacenamiento cifrado.
  */
 
-const CACHE = "filiaciones-app-v099";
+"use strict";
+
+const CACHE = "filiaciones-app-v0910";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
-  "./exportacion.js?v=099",
-  "./app.js?v=099",
+
   "./almacenamiento.js",
+
+  "./exportacion.js?v=0910",
+  "./app.js?v=0910",
+
   "./seguridad.js?v=071",
+
   "./copias.js?v=080",
   "./boton-copias.js?v=081",
+
   "./restauracion.js?v=095",
   "./pantalla-restauracion.js?v=094"
 ];
 
-self.addEventListener("install", event => {
-  event.waitUntil(
+/*
+ * INSTALACIÓN
+ *
+ * Guarda los archivos de la aplicación
+ * para que puedan utilizarse sin conexión.
+ */
+
+self.addEventListener("install", evento => {
+  evento.waitUntil(
     caches.open(CACHE)
       .then(cache => cache.addAll(ARCHIVOS))
       .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    Promise.all([
-      caches.keys().then(keys =>
-        Promise.all(
-          keys
-            .filter(
-              key =>
-                key.startsWith("filiaciones-app-") &&
-                key !== CACHE
+/*
+ * ACTIVACIÓN
+ *
+ * Elimina únicamente las cachés antiguas
+ * cuyo nombre comience por
+ * "filiaciones-app-".
+ *
+ * No accede a IndexedDB ni a los datos
+ * cifrados de las actuaciones.
+ */
+
+self.addEventListener("activate", evento => {
+  evento.waitUntil(
+    caches.keys()
+      .then(nombres => {
+        return Promise.all(
+          nombres
+            .filter(nombre =>
+              nombre.startsWith(
+                "filiaciones-app-"
+              ) &&
+              nombre !== CACHE
             )
-            .map(key => caches.delete(key))
-        )
-      ),
-      self.clients.claim()
-    ])
+            .map(nombre =>
+              caches.delete(nombre)
+            )
+        );
+      })
+      .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener("fetch", event => {
-  const req = event.request;
+/*
+ * PETICIONES
+ *
+ * Navegación:
+ * intenta primero la red.
+ * Si no hay conexión, utiliza
+ * la página almacenada.
+ *
+ * Archivos estáticos:
+ * utiliza primero la caché.
+ */
 
-  if (req.method !== "GET") return;
+self.addEventListener("fetch", evento => {
+  const peticion = evento.request;
 
-  const url = new URL(req.url);
+  if (peticion.method !== "GET") {
+    return;
+  }
+
+  const url = new URL(peticion.url);
 
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  const esNavegacion =
-    req.mode === "navigate";
+  if (peticion.mode === "navigate") {
+    evento.respondWith(
+      fetch(peticion)
+        .then(respuesta => {
+          if (respuesta.ok) {
+            const copia = respuesta.clone();
 
-  const esArchivo =
-    /\/(?:index\.html|exportacion\.js|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js|restauracion\.js|pantalla-restauracion\.js)$/.test(
-      url.pathname
+            evento.waitUntil(
+              caches.open(CACHE)
+                .then(cache =>
+                  cache.put(
+                    "./index.html",
+                    copia
+                  )
+                )
+            );
+          }
+
+          return respuesta;
+        })
+        .catch(async () => {
+          const cache =
+            await caches.open(CACHE);
+
+          return (
+            await cache.match(
+              "./index.html"
+            )
+          ) || Response.error();
+        })
     );
 
-  if (!esNavegacion && !esArchivo) {
     return;
   }
 
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-
-    if (esNavegacion) {
-      try {
-        const respuesta = await fetch(req);
-
-        if (respuesta.ok) {
-          return respuesta;
+  evento.respondWith(
+    caches.match(peticion)
+      .then(respuestaGuardada => {
+        if (respuestaGuardada) {
+          return respuestaGuardada;
         }
 
-        return (
-          (await cache.match("./index.html")) ||
-          respuesta
-        );
-      } catch {
-        return (
-          (await cache.match("./index.html")) ||
-          Response.error()
-        );
-      }
-    }
-
-    const guardada = await cache.match(req);
-
-    if (guardada) {
-      return guardada;
-    }
-
-    return fetch(req);
-  })());
+        return fetch(peticion);
+      })
+  );
 });
