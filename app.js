@@ -1,7 +1,7 @@
 
 /*
- * FILIACIONES BETA 0.9.7
- * Formulario de actuaciones y exportación a Word.
+ * FILIACIONES BETA 0.9.8
+ * Vinculación de personas y vehículos.
  * SOLO DATOS FICTICIOS.
  */
 "use strict";
@@ -33,8 +33,8 @@ const esquemas = {
     ["modelo", "Modelo"],
     ["color", "Color"],
     ["bastidor", "Bastidor VIN"],
-    ["titular", "Titular"],
-    ["conductor", "Conductor"],
+    ["titular", "Titular (texto libre anterior)"],
+    ["conductor", "Conductor (texto libre anterior)"],
     ["observaciones", "Observaciones"]
   ],
   objetos: [
@@ -52,6 +52,15 @@ const nombres = {
   objetos: "Objeto"
 };
 
+const roles = [
+  "Conductor",
+  "Propietario",
+  "Titular",
+  "Ocupante",
+  "Acompañante",
+  "Otra"
+];
+
 function principal() {
   return document.querySelector("main");
 }
@@ -60,25 +69,25 @@ function limpiar() {
   principal().replaceChildren();
 }
 
-function titulo(texto) {
+function titulo(t) {
   const h = document.createElement("h2");
-  h.textContent = texto;
-  principal().appendChild(h);
+  h.textContent = t;
+  principal().append(h);
 }
 
-function aviso(texto, destino = principal()) {
+function aviso(t, destino = principal()) {
   const p = document.createElement("p");
-  p.textContent = texto;
-  destino.appendChild(p);
+  p.textContent = t;
+  destino.append(p);
   return p;
 }
 
-function boton(texto, funcion, destino = principal()) {
+function boton(t, fn, destino = principal()) {
   const b = document.createElement("button");
   b.type = "button";
-  b.textContent = texto;
-  b.addEventListener("click", funcion);
-  destino.appendChild(b);
+  b.textContent = t;
+  b.addEventListener("click", fn);
+  destino.append(b);
   return b;
 }
 
@@ -104,6 +113,10 @@ function fechaHoraLocal() {
   };
 }
 
+function identificador() {
+  return crypto.randomUUID();
+}
+
 function normalizar(registro) {
   const obj = structuredClone(registro);
 
@@ -111,6 +124,33 @@ function normalizar(registro) {
     if (!Array.isArray(obj[tipo])) {
       obj[tipo] = [];
     }
+  }
+
+  // Adaptación en memoria de actuaciones antiguas.
+  // No se guardan cambios hasta pulsar Guardar.
+  const usados = new Set();
+
+  for (const persona of obj.personas) {
+    if (
+      !persona.idPersona ||
+      usados.has(persona.idPersona)
+    ) {
+      persona.idPersona = identificador();
+    }
+    usados.add(persona.idPersona);
+  }
+
+  for (const vehiculo of obj.vehiculos) {
+    if (!Array.isArray(vehiculo.vinculos)) {
+      vehiculo.vinculos = [];
+    }
+
+    vehiculo.vinculos = vehiculo.vinculos.filter(
+      relacion =>
+        relacion &&
+        usados.has(relacion.personaId) &&
+        typeof relacion.rol === "string"
+    );
   }
 
   return obj;
@@ -123,7 +163,6 @@ function comprobarAcceso() {
     acceso();
     return false;
   }
-
   return true;
 }
 
@@ -136,6 +175,28 @@ function marcarGuardado() {
   cambiosPendientes = false;
 }
 
+function leer() {
+  if (!actuacion) return;
+
+  principal()
+    .querySelectorAll("[data-campo]")
+    .forEach(e => {
+      const tipo = e.dataset.tipo;
+      const nombre = e.dataset.campo;
+
+      if (!tipo) {
+        actuacion[nombre] = e.value;
+      } else {
+        const registro =
+          actuacion[tipo]?.[Number(e.dataset.indice)];
+
+        if (registro) {
+          registro[nombre] = e.value;
+        }
+      }
+    });
+}
+
 function comprobarCambios() {
   leer();
   cambiosPendientes =
@@ -144,9 +205,7 @@ function comprobarCambios() {
 }
 
 function confirmarSalida() {
-  if (!actuacion) return true;
-
-  if (!comprobarCambios()) {
+  if (!actuacion || !comprobarCambios()) {
     return true;
   }
 
@@ -210,30 +269,8 @@ function campo(
     cambiosPendientes = true;
   });
 
-  l.appendChild(e);
+  l.append(e);
   return l;
-}
-
-function leer() {
-  if (!actuacion) return;
-
-  principal()
-    .querySelectorAll("[data-campo]")
-    .forEach(e => {
-      const tipo = e.dataset.tipo;
-      const nombre = e.dataset.campo;
-
-      if (!tipo) {
-        actuacion[nombre] = e.value;
-      } else {
-        const indice = Number(e.dataset.indice);
-        const registro = actuacion[tipo]?.[indice];
-
-        if (registro) {
-          registro[nombre] = e.value;
-        }
-      }
-    });
 }
 
 function nuevaActuacion() {
@@ -242,6 +279,7 @@ function nuevaActuacion() {
   actuacion = {
     ...fechaHoraLocal(),
     referencia: "",
+    numeroAtestado: "",
     lugar: "",
     agentes: "",
     personas: [],
@@ -253,9 +291,154 @@ function nuevaActuacion() {
   dibujar();
 }
 
-function ficha(tipo, registro, indice) {
-  const singular = nombres[tipo];
+function selector(opciones, valor) {
+  const s = document.createElement("select");
 
+  s.style.cssText = [
+    "display:block",
+    "width:100%",
+    "padding:12px",
+    "margin:6px 0 12px",
+    "font-size:16px"
+  ].join(";");
+
+  for (const [id, nombre] of opciones) {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = nombre;
+    s.append(o);
+  }
+
+  s.value = valor;
+  return s;
+}
+
+function abrirVehiculo(indice) {
+  const seccion = principal().querySelector(
+    'section[data-tipo="vehiculos"]'
+  );
+
+  const ficha = seccion
+    ?.querySelectorAll("details")[indice];
+
+  if (ficha) {
+    ficha.open = true;
+    ficha.scrollIntoView({
+      block: "start"
+    });
+  }
+}
+
+function vinculaciones(vehiculo, indice, destino) {
+  const caja = document.createElement("div");
+
+  caja.style.cssText =
+    "border-top:1px solid #ddd;" +
+    "margin-top:14px;padding-top:12px";
+
+  const h = document.createElement("h4");
+  h.textContent = "Personas vinculadas";
+  caja.append(h);
+
+  if (!actuacion.personas.length) {
+    aviso(
+      "Añade primero una persona para vincularla.",
+      caja
+    );
+  }
+
+  vehiculo.vinculos.forEach((relacion, j) => {
+    const persona = actuacion.personas.find(
+      p => p.idPersona === relacion.personaId
+    );
+
+    if (!persona) return;
+
+    const fila = document.createElement("div");
+
+    fila.style.cssText =
+      "border:1px solid #ddd;" +
+      "border-radius:8px;" +
+      "padding:10px;margin:8px 0";
+
+    aviso(
+      (persona.nombre ||
+        "Persona " +
+        (actuacion.personas.indexOf(persona) + 1)) +
+      " — " + relacion.rol,
+      fila
+    );
+
+    boton(
+      "Quitar vinculación",
+      () => {
+        leer();
+        vehiculo.vinculos.splice(j, 1);
+        cambiosPendientes = true;
+        dibujar();
+        abrirVehiculo(indice);
+      },
+      fila
+    );
+
+    caja.append(fila);
+  });
+
+  if (actuacion.personas.length) {
+    const disponibles = actuacion.personas.map(
+      (persona, i) => [
+        persona.idPersona,
+        (i + 1) + ". " +
+        (persona.nombre || "Sin nombre")
+      ]
+    );
+
+    const selectorPersona = selector(
+      disponibles,
+      disponibles[0][0]
+    );
+
+    const selectorRol = selector(
+      roles.map(rol => [rol, rol]),
+      roles[0]
+    );
+
+    caja.append(selectorPersona, selectorRol);
+
+    boton(
+      "+ Vincular persona",
+      () => {
+        leer();
+
+        const existe = vehiculo.vinculos.some(
+          relacion =>
+            relacion.personaId ===
+              selectorPersona.value &&
+            relacion.rol === selectorRol.value
+        );
+
+        if (existe) {
+          alert("Esta vinculación ya existe.");
+          return;
+        }
+
+        vehiculo.vinculos.push({
+          personaId: selectorPersona.value,
+          rol: selectorRol.value
+        });
+
+        cambiosPendientes = true;
+        dibujar();
+        abrirVehiculo(indice);
+      },
+      caja
+    );
+  }
+
+  destino.append(caja);
+}
+
+function ficha(tipo, registro, indice) {
   const d = document.createElement("details");
 
   d.style.cssText = [
@@ -270,15 +453,15 @@ function ficha(tipo, registro, indice) {
   const encabezado = document.createElement("summary");
 
   encabezado.textContent =
-    singular + " " + (indice + 1);
+    nombres[tipo] + " " + (indice + 1);
 
   encabezado.style.cssText =
     "font-weight:700;cursor:pointer;padding:8px 0";
 
-  d.appendChild(encabezado);
+  d.append(encabezado);
 
   for (const [nombre, etiqueta] of esquemas[tipo]) {
-    d.appendChild(
+    d.append(
       campo(
         etiqueta,
         nombre,
@@ -289,21 +472,55 @@ function ficha(tipo, registro, indice) {
     );
   }
 
+  if (tipo === "vehiculos") {
+    vinculaciones(registro, indice, d);
+  }
+
   boton(
-    "Eliminar " + singular.toLowerCase() +
+    "Eliminar " +
+    nombres[tipo].toLowerCase() +
     " " + (indice + 1),
     () => {
       leer();
 
-      if (!confirm(
+      const afectados =
+        tipo === "personas"
+          ? actuacion.vehiculos.reduce(
+              (total, vehiculo) =>
+                total +
+                vehiculo.vinculos.filter(
+                  relacion =>
+                    relacion.personaId ===
+                    registro.idPersona
+                ).length,
+              0
+            )
+          : 0;
+
+      const mensaje =
         "¿Eliminar " +
-        singular.toLowerCase() +
+        nombres[tipo].toLowerCase() +
         " " + (indice + 1) +
-        " de esta actuación?\n\n" +
-        "El cambio se guardará cuando pulses " +
-        "Guardar actuación cifrada."
-      )) {
-        return;
+        " de esta actuación?" +
+        (afectados
+          ? "\n\nTambién se eliminarán " +
+            afectados +
+            " vinculaciones con vehículos."
+          : "") +
+        "\n\nEl cambio se guardará cuando " +
+        "pulses Guardar actuación cifrada.";
+
+      if (!confirm(mensaje)) return;
+
+      if (tipo === "personas") {
+        for (const vehiculo of actuacion.vehiculos) {
+          vehiculo.vinculos =
+            vehiculo.vinculos.filter(
+              relacion =>
+                relacion.personaId !==
+                registro.idPersona
+            );
+        }
       }
 
       actuacion[tipo].splice(indice, 1);
@@ -317,9 +534,8 @@ function ficha(tipo, registro, indice) {
 }
 
 function seccion(tipo) {
-  const singular = nombres[tipo];
-
   const s = document.createElement("section");
+  s.dataset.tipo = tipo;
 
   s.style.cssText =
     "margin:20px 0;padding:12px 0;" +
@@ -332,14 +548,14 @@ function seccion(tipo) {
     tipo.slice(1) +
     " (" + actuacion[tipo].length + ")";
 
-  s.appendChild(h);
+  s.append(h);
 
   actuacion[tipo].forEach((registro, indice) => {
-    s.appendChild(ficha(tipo, registro, indice));
+    s.append(ficha(tipo, registro, indice));
   });
 
   boton(
-    "+ Añadir " + singular.toLowerCase(),
+    "+ Añadir " + nombres[tipo].toLowerCase(),
     () => {
       leer();
 
@@ -349,19 +565,25 @@ function seccion(tipo) {
         nuevo[nombre] = "";
       }
 
+      if (tipo === "personas") {
+        nuevo.idPersona = identificador();
+      }
+
+      if (tipo === "vehiculos") {
+        nuevo.vinculos = [];
+      }
+
       actuacion[tipo].push(nuevo);
       cambiosPendientes = true;
       dibujar();
 
-      const fichas = principal().querySelectorAll(
-        "details"
+      const seccionActual = principal().querySelector(
+        'section[data-tipo="' + tipo + '"]'
       );
 
-      const ultima = Array.from(fichas)
-        .filter(d =>
-          d.closest("section")?.dataset.tipo === tipo
-        )
-        .at(-1);
+      const ultima = Array.from(
+        seccionActual.querySelectorAll("details")
+      ).at(-1);
 
       if (ultima) {
         ultima.open = true;
@@ -374,8 +596,7 @@ function seccion(tipo) {
     s
   );
 
-  s.dataset.tipo = tipo;
-  principal().appendChild(s);
+  principal().append(s);
 }
 
 function dibujar() {
@@ -391,13 +612,14 @@ function dibujar() {
   );
 
   for (const [nombre, etiqueta] of [
-    ["referencia", "Referencia"],
+    ["referencia", "Referencia de actuación"],
+    ["numeroAtestado", "Número de atestado (si existe)"],
     ["fecha", "Fecha"],
     ["hora", "Hora"],
     ["lugar", "Lugar"],
     ["agentes", "Agentes intervinientes"]
   ]) {
-    principal().appendChild(
+    principal().append(
       campo(etiqueta, nombre, actuacion[nombre])
     );
   }
@@ -407,21 +629,15 @@ function dibujar() {
   seccion("objetos");
 
   boton("Guardar actuación cifrada", guardarActual);
-
   boton("Exportar a Word (.docx)", exportarWord);
-
   boton("Ver resumen", resumen);
 
   boton("Volver al menú", () => {
-    if (confirmarSalida()) {
-      menu();
-    }
+    if (confirmarSalida()) menu();
   });
 
   boton("Bloquear aplicación", () => {
-    if (confirmarSalida()) {
-      bloquear();
-    }
+    if (confirmarSalida()) bloquear();
   });
 
   aviso(
@@ -448,16 +664,16 @@ async function exportarWord() {
       );
     }
 
-    if (comprobarCambios()) {
-      const continuar = confirm(
+    if (
+      comprobarCambios() &&
+      !confirm(
         "Hay cambios sin guardar.\n\n" +
-        "El documento incluirá los datos actuales " +
-        "del formulario, aunque todavía no se hayan " +
-        "guardado en la actuación cifrada.\n\n" +
-        "¿Quieres continuar?"
-      );
-
-      if (!continuar) return;
+        "El documento incluirá los datos actuales, " +
+        "aunque no estén guardados.\n\n" +
+        "¿Continuar?"
+      )
+    ) {
+      return;
     }
 
     await window.Exportacion.exportar(
@@ -465,8 +681,9 @@ async function exportarWord() {
     );
 
   } catch (e) {
-    if (e?.name === "AbortError") return;
-    error(e);
+    if (e?.name !== "AbortError") {
+      error(e);
+    }
   }
 }
 
@@ -518,7 +735,7 @@ function resumen() {
       "border-radius:8px"
     ].join(";");
 
-    principal().appendChild(p);
+    principal().append(p);
   }
 
   p.textContent = JSON.stringify(actuacion, null, 2);
@@ -546,7 +763,6 @@ async function acceso() {
     const existe = await Almacenamiento.existe();
 
     const p = document.createElement("input");
-
     p.type = "password";
     p.autocomplete = "off";
 
@@ -559,7 +775,7 @@ async function acceso() {
       "box-sizing:border-box;padding:12px;" +
       "margin:12px 0;font-size:16px";
 
-    principal().appendChild(p);
+    principal().append(p);
 
     let confirmar = null;
 
@@ -569,7 +785,7 @@ async function acceso() {
       confirmar.autocomplete = "off";
       confirmar.placeholder = "Repite la contraseña";
       confirmar.style.cssText = p.style.cssText;
-      principal().appendChild(confirmar);
+      principal().append(confirmar);
     }
 
     boton(
@@ -602,8 +818,7 @@ async function acceso() {
     );
 
     aviso(
-      "Versión de pruebas. " +
-      "No introduzcas datos reales."
+      "Versión de pruebas. No introduzcas datos reales."
     );
 
   } catch (e) {
@@ -661,48 +876,50 @@ async function consultar() {
     for (const registro of lista) {
       const s = document.createElement("section");
 
-      s.style.cssText = [
-        "padding:12px",
-        "margin:10px 0",
-        "border:1px solid #888",
-        "border-radius:8px"
-      ].join(";");
+      s.style.cssText =
+        "padding:12px;margin:10px 0;" +
+        "border:1px solid #888;border-radius:8px";
 
-      const p = document.createElement("p");
-
-      p.textContent =
+      aviso(
         "Referencia: " +
         (registro.referencia || "(sin referencia)") +
-        " — " +
-        (registro.fecha || "");
+        " — " + (registro.fecha || ""),
+        s
+      );
 
-      s.appendChild(p);
+      boton(
+        "Abrir y editar",
+        () => {
+          actuacion = normalizar(registro);
+          marcarGuardado();
+          dibujar();
+        },
+        s
+      );
 
-      boton("Abrir y editar", () => {
-        actuacion = normalizar(registro);
-        marcarGuardado();
-        dibujar();
-      }, s);
+      boton(
+        "Eliminar",
+        async () => {
+          if (!confirm(
+            "¿Eliminar definitivamente esta " +
+            "actuación de prueba?\n\n" +
+            "Esta operación no se puede deshacer " +
+            "sin una copia de seguridad."
+          )) {
+            return;
+          }
 
-      boton("Eliminar", async () => {
-        if (!confirm(
-          "¿Eliminar definitivamente esta " +
-          "actuación de prueba?\n\n" +
-          "Esta operación no se puede deshacer " +
-          "sin una copia de seguridad."
-        )) {
-          return;
-        }
+          try {
+            await Almacenamiento.eliminar(registro.id);
+            await consultar();
+          } catch (e) {
+            error(e);
+          }
+        },
+        s
+      );
 
-        try {
-          await Almacenamiento.eliminar(registro.id);
-          await consultar();
-        } catch (e) {
-          error(e);
-        }
-      }, s);
-
-      principal().appendChild(s);
+      principal().append(s);
     }
 
   } catch (e) {
@@ -732,10 +949,7 @@ window.mostrar = function(nombre) {
 };
 
 if (document.readyState === "loading") {
-  document.addEventListener(
-    "DOMContentLoaded",
-    acceso
-  );
+  document.addEventListener("DOMContentLoaded", acceso);
 } else {
   acceso();
 }
