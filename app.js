@@ -1,6 +1,6 @@
 
 /*
- * FILIACIONES BETA 0.9.10
+ * FILIACIONES BETA 0.9.11
  *
  * Recogida local de datos.
  * Personas, vehículos y objetos.
@@ -17,6 +17,7 @@
 let actuacion = null;
 let estadoGuardado = "";
 let cambiosPendientes = false;
+let archivoGestorPreparado = null;
 
 const esquemas = {
   personas: [
@@ -90,7 +91,11 @@ function aviso(texto, destino = principal()) {
   return p;
 }
 
-function boton(texto, funcion, destino = principal()) {
+function boton(
+  texto,
+  funcion,
+  destino = principal()
+) {
   const b = document.createElement("button");
   b.type = "button";
   b.textContent = texto;
@@ -108,7 +113,8 @@ function error(e) {
 
 function fechaHoraLocal() {
   const d = new Date();
-  const dos = n => String(n).padStart(2, "0");
+  const dos = n =>
+    String(n).padStart(2, "0");
 
   return {
     fecha:
@@ -123,6 +129,10 @@ function fechaHoraLocal() {
 
 function identificador() {
   return crypto.randomUUID();
+}
+
+function descartarArchivoPreparado() {
+  archivoGestorPreparado = null;
 }
 
 function normalizar(registro) {
@@ -152,12 +162,13 @@ function normalizar(registro) {
       vehiculo.vinculos = [];
     }
 
-    vehiculo.vinculos = vehiculo.vinculos.filter(
-      relacion =>
-        relacion &&
-        usados.has(relacion.personaId) &&
-        typeof relacion.rol === "string"
-    );
+    vehiculo.vinculos =
+      vehiculo.vinculos.filter(
+        relacion =>
+          relacion &&
+          usados.has(relacion.personaId) &&
+          typeof relacion.rol === "string"
+      );
   }
 
   return obj;
@@ -167,6 +178,7 @@ function comprobarAcceso() {
   if (!Almacenamiento.desbloqueado()) {
     actuacion = null;
     cambiosPendientes = false;
+    descartarArchivoPreparado();
     acceso();
     return false;
   }
@@ -282,6 +294,7 @@ function campo(
 
   e.addEventListener("input", () => {
     cambiosPendientes = true;
+    descartarArchivoPreparado();
   });
 
   l.append(e);
@@ -290,6 +303,8 @@ function campo(
 
 function nuevaActuacion() {
   if (!comprobarAcceso()) return;
+
+  descartarArchivoPreparado();
 
   actuacion = {
     ...fechaHoraLocal(),
@@ -344,7 +359,11 @@ function abrirVehiculo(indice) {
   }
 }
 
-function vinculaciones(vehiculo, indice, destino) {
+function vinculaciones(
+  vehiculo,
+  indice,
+  destino
+) {
   const caja = document.createElement("div");
 
   caja.style.cssText =
@@ -391,6 +410,7 @@ function vinculaciones(vehiculo, indice, destino) {
       "Quitar vinculación",
       () => {
         leer();
+        descartarArchivoPreparado();
         vehiculo.vinculos.splice(j, 1);
         cambiosPendientes = true;
         dibujar();
@@ -403,13 +423,14 @@ function vinculaciones(vehiculo, indice, destino) {
   });
 
   if (actuacion.personas.length) {
-    const disponibles = actuacion.personas.map(
-      (persona, i) => [
-        persona.idPersona,
-        (i + 1) + ". " +
-        (persona.nombre || "Sin nombre")
-      ]
-    );
+    const disponibles =
+      actuacion.personas.map(
+        (persona, i) => [
+          persona.idPersona,
+          (i + 1) + ". " +
+          (persona.nombre || "Sin nombre")
+        ]
+      );
 
     const selectorPersona = selector(
       disponibles,
@@ -421,7 +442,10 @@ function vinculaciones(vehiculo, indice, destino) {
       roles[0]
     );
 
-    caja.append(selectorPersona, selectorRol);
+    caja.append(
+      selectorPersona,
+      selectorRol
+    );
 
     boton(
       "+ Vincular persona",
@@ -436,9 +460,13 @@ function vinculaciones(vehiculo, indice, destino) {
         );
 
         if (existe) {
-          alert("Esta vinculación ya existe.");
+          alert(
+            "Esta vinculación ya existe."
+          );
           return;
         }
+
+        descartarArchivoPreparado();
 
         vehiculo.vinculos.push({
           personaId: selectorPersona.value,
@@ -468,7 +496,8 @@ function ficha(tipo, registro, indice) {
     "color:#17253c"
   ].join(";");
 
-  const encabezado = document.createElement("summary");
+  const encabezado =
+    document.createElement("summary");
 
   encabezado.textContent =
     nombres[tipo] + " " + (indice + 1);
@@ -480,7 +509,10 @@ function ficha(tipo, registro, indice) {
 
   d.append(encabezado);
 
-  for (const [nombre, etiqueta] of esquemas[tipo]) {
+  for (
+    const [nombre, etiqueta]
+    of esquemas[tipo]
+  ) {
     d.append(
       campo(
         etiqueta,
@@ -493,7 +525,11 @@ function ficha(tipo, registro, indice) {
   }
 
   if (tipo === "vehiculos") {
-    vinculaciones(registro, indice, d);
+    vinculaciones(
+      registro,
+      indice,
+      d
+    );
   }
 
   boton(
@@ -534,8 +570,13 @@ function ficha(tipo, registro, indice) {
 
       if (!confirm(mensaje)) return;
 
+      descartarArchivoPreparado();
+
       if (tipo === "personas") {
-        for (const vehiculo of actuacion.vehiculos) {
+        for (
+          const vehiculo
+          of actuacion.vehiculos
+        ) {
           vehiculo.vinculos =
             vehiculo.vinculos.filter(
               relacion =>
@@ -569,22 +610,33 @@ function seccion(tipo) {
   h.textContent =
     tipo.charAt(0).toUpperCase() +
     tipo.slice(1) +
-    " (" + actuacion[tipo].length + ")";
+    " (" +
+    actuacion[tipo].length +
+    ")";
 
   s.append(h);
 
-  actuacion[tipo].forEach((registro, indice) => {
-    s.append(ficha(tipo, registro, indice));
-  });
+  actuacion[tipo].forEach(
+    (registro, indice) => {
+      s.append(
+        ficha(tipo, registro, indice)
+      );
+    }
+  );
 
   boton(
-    "+ Añadir " + nombres[tipo].toLowerCase(),
+    "+ Añadir " +
+    nombres[tipo].toLowerCase(),
     () => {
       leer();
+      descartarArchivoPreparado();
 
       const nuevo = {};
 
-      for (const [nombre] of esquemas[tipo]) {
+      for (
+        const [nombre]
+        of esquemas[tipo]
+      ) {
         nuevo[nombre] = "";
       }
 
@@ -600,12 +652,17 @@ function seccion(tipo) {
       cambiosPendientes = true;
       dibujar();
 
-      const seccionActual = principal().querySelector(
-        'section[data-tipo="' + tipo + '"]'
-      );
+      const seccionActual =
+        principal().querySelector(
+          'section[data-tipo="' +
+          tipo +
+          '"]'
+        );
 
       const ultima = Array.from(
-        seccionActual.querySelectorAll("details")
+        seccionActual.querySelectorAll(
+          "details"
+        )
       ).at(-1);
 
       if (ultima) {
@@ -623,7 +680,12 @@ function seccion(tipo) {
 }
 
 function dibujar() {
-  if (!comprobarAcceso() || !actuacion) return;
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return;
+  }
 
   limpiar();
   titulo("Ficha de actuación");
@@ -634,16 +696,32 @@ function dibujar() {
       : "Nueva actuación. Pendiente de guardar."
   );
 
-  for (const [nombre, etiqueta] of [
-    ["referencia", "Referencia de actuación"],
-    ["numeroAtestado", "Número de atestado (si existe)"],
-    ["fecha", "Fecha"],
-    ["hora", "Hora"],
-    ["lugar", "Lugar"],
-    ["agentes", "Agentes intervinientes"]
-  ]) {
+  for (
+    const [nombre, etiqueta]
+    of [
+      [
+        "referencia",
+        "Referencia de actuación"
+      ],
+      [
+        "numeroAtestado",
+        "Número de atestado (si existe)"
+      ],
+      ["fecha", "Fecha"],
+      ["hora", "Hora"],
+      ["lugar", "Lugar"],
+      [
+        "agentes",
+        "Agentes intervinientes"
+      ]
+    ]
+  ) {
     principal().append(
-      campo(etiqueta, nombre, actuacion[nombre])
+      campo(
+        etiqueta,
+        nombre,
+        actuacion[nombre]
+      )
     );
   }
 
@@ -658,27 +736,35 @@ function dibujar() {
 
   boton(
     "Exportar ficha de filiación Word (.docx)",
-    () => exportarWord("ficha")
+    () => exportarFichaWord()
   );
 
   boton(
     "Exportar para Gestor Policial (cifrado)",
-    () => exportarWord("gestor")
+    mostrarFormularioExportacion
   );
 
-  boton("Ver resumen", resumen);
+  boton(
+    "Ver resumen",
+    resumen
+  );
 
   boton(
     "Volver al menú",
     () => {
-      if (confirmarSalida()) menu();
+      if (confirmarSalida()) {
+        descartarArchivoPreparado();
+        menu();
+      }
     }
   );
 
   boton(
     "Bloquear aplicación",
     () => {
-      if (confirmarSalida()) bloquear();
+      if (confirmarSalida()) {
+        bloquear();
+      }
     }
   );
 
@@ -689,73 +775,391 @@ function dibujar() {
   );
 }
 
-async function exportarWord(formato = "ficha") {
-  if (!comprobarAcceso() || !actuacion) return;
+function validarExportacion() {
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return false;
+  }
+
+  leer();
+
+  if (
+    !String(
+      actuacion.referencia || ""
+    ).trim()
+  ) {
+    alert(
+      "Introduce una referencia " +
+      "para exportar."
+    );
+    return false;
+  }
+
+  if (
+    comprobarCambios() &&
+    !confirm(
+      "Hay cambios sin guardar.\n\n" +
+      "La exportación incluirá los datos " +
+      "actuales, aunque no estén guardados.\n\n" +
+      "¿Continuar?"
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+async function exportarFichaWord() {
+  if (!validarExportacion()) {
+    return;
+  }
 
   try {
-    if (!window.Exportacion?.exportar) {
+    if (
+      !window.Exportacion?.exportarFicha
+    ) {
       throw Error(
-        "El módulo de exportación no está cargado."
+        "El módulo de exportación " +
+        "no está actualizado."
       );
     }
 
-    leer();
-
-    if (
-      !String(actuacion.referencia || "").trim()
-    ) {
-      throw Error(
-        "Introduce una referencia para exportar."
-      );
-    }
-
-    if (
-      comprobarCambios() &&
-      !confirm(
-        "Hay cambios sin guardar.\n\n" +
-        "La exportación incluirá los datos " +
-        "actuales, aunque no estén guardados.\n\n" +
-        "¿Continuar?"
-      )
-    ) {
-      return;
-    }
-
-    await window.Exportacion.exportar(
-      structuredClone(actuacion),
-      formato
+    await window.Exportacion.exportarFicha(
+      structuredClone(actuacion)
     );
 
   } catch (e) {
-    if (e?.name !== "AbortError") {
+    if (
+      e?.name !== "AbortError"
+    ) {
       error(e);
     }
   }
 }
 
+function mostrarFormularioExportacion() {
+  if (!validarExportacion()) {
+    return;
+  }
+
+  descartarArchivoPreparado();
+
+  const anterior =
+    document.getElementById(
+      "formulario-exportacion-gestor"
+    );
+
+  if (anterior) {
+    anterior.remove();
+  }
+
+  const caja =
+    document.createElement("section");
+
+  caja.id =
+    "formulario-exportacion-gestor";
+
+  caja.style.cssText = [
+    "background:#ffffff",
+    "color:#17253c",
+    "border:2px solid #244e79",
+    "border-radius:12px",
+    "padding:16px",
+    "margin:18px 0"
+  ].join(";");
+
+  const h =
+    document.createElement("h3");
+
+  h.textContent =
+    "Exportación cifrada para Gestor Policial";
+
+  caja.append(h);
+
+  aviso(
+    "Introduce una contraseña independiente " +
+    "de la contraseña de Filiaciones. " +
+    "El archivo se cifrará antes de compartirlo.",
+    caja
+  );
+
+  function campoClave(etiqueta) {
+    const l =
+      document.createElement("label");
+
+    l.textContent = etiqueta;
+
+    l.style.cssText =
+      "display:block;" +
+      "font-weight:600;" +
+      "margin:14px 0";
+
+    const entrada =
+      document.createElement("input");
+
+    entrada.type = "password";
+    entrada.autocomplete = "off";
+    entrada.spellcheck = false;
+
+    entrada.style.cssText = [
+      "display:block",
+      "width:100%",
+      "padding:12px",
+      "margin-top:6px",
+      "font-size:16px",
+      "border:1px solid #cbd5e1",
+      "border-radius:8px"
+    ].join(";");
+
+    l.append(entrada);
+    caja.append(l);
+
+    return entrada;
+  }
+
+  const primera =
+    campoClave(
+      "Contraseña de exportación"
+    );
+
+  const segunda =
+    campoClave(
+      "Repetir contraseña"
+    );
+
+  const estado =
+    document.createElement("p");
+
+  estado.setAttribute(
+    "role",
+    "status"
+  );
+
+  caja.append(estado);
+
+  const preparar = boton(
+    "1. Preparar archivo cifrado",
+    async () => {
+      const clave = primera.value;
+      const repetida = segunda.value;
+
+      if (clave.length < 12) {
+        estado.textContent =
+          "La contraseña debe tener " +
+          "al menos 12 caracteres.";
+        return;
+      }
+
+      if (clave !== repetida) {
+        estado.textContent =
+          "Las contraseñas no coinciden.";
+        return;
+      }
+
+      if (!window.Exportacion
+        ?.prepararArchivoGestor) {
+        estado.textContent =
+          "El módulo de exportación " +
+          "no está actualizado.";
+        return;
+      }
+
+      preparar.disabled = true;
+      estado.textContent =
+        "Cifrando archivo. Espera...";
+
+      const copia =
+        structuredClone(actuacion);
+
+      const huella =
+        JSON.stringify(actuacion);
+
+      try {
+        descartarArchivoPreparado();
+
+        const archivo =
+          await window.Exportacion
+            .prepararArchivoGestor(
+              copia,
+              clave
+            );
+
+        if (
+          !Almacenamiento.desbloqueado() ||
+          !actuacion ||
+          JSON.stringify(actuacion) !== huella
+        ) {
+          throw Error(
+            "La actuación ha cambiado " +
+            "durante la preparación. " +
+            "Vuelve a generar el archivo."
+          );
+        }
+
+        archivoGestorPreparado = archivo;
+
+        primera.value = "";
+        segunda.value = "";
+
+        estado.textContent =
+          "Archivo cifrado preparado: " +
+          archivo.name +
+          ". Ahora pulsa el botón 2 " +
+          "para guardarlo.";
+
+        botonGuardar.disabled = false;
+
+      } catch (e) {
+        descartarArchivoPreparado();
+
+        estado.textContent =
+          "Error al cifrar: " +
+          (e?.message || String(e));
+
+      } finally {
+        preparar.disabled = false;
+      }
+    },
+    caja
+  );
+
+  const botonGuardar = boton(
+    "2. Guardar archivo cifrado en el iPhone",
+    () => {
+      if (!archivoGestorPreparado) {
+        estado.textContent =
+          "Primero debes preparar " +
+          "el archivo cifrado.";
+        return;
+      }
+
+      if (
+        !window.Exportacion
+          ?.compartirArchivoPreparado
+      ) {
+        estado.textContent =
+          "El módulo de exportación " +
+          "no está actualizado.";
+        return;
+      }
+
+      /*
+       * IMPORTANTE:
+       * Se llama directamente desde
+       * la pulsación del botón.
+       * No hay await previo.
+       */
+      let resultado;
+
+      try {
+        resultado =
+          window.Exportacion
+            .compartirArchivoPreparado(
+              archivoGestorPreparado
+            );
+      } catch (e) {
+        estado.textContent =
+          "Error al guardar: " +
+          (e?.message || String(e));
+        return;
+      }
+
+      Promise.resolve(resultado)
+        .then(() => {
+          estado.textContent =
+            "Operación de entrega " +
+            "del archivo completada.";
+        })
+        .catch(e => {
+          if (
+            e?.name === "AbortError"
+          ) {
+            estado.textContent =
+              "Se canceló la operación. " +
+              "Puedes volver a pulsar " +
+              "Guardar archivo.";
+          } else {
+            estado.textContent =
+              "Error al compartir: " +
+              (e?.message || String(e));
+          }
+        });
+    },
+    caja
+  );
+
+  botonGuardar.disabled = true;
+
+  boton(
+    "Cancelar exportación",
+    () => {
+      primera.value = "";
+      segunda.value = "";
+      descartarArchivoPreparado();
+      caja.remove();
+    },
+    caja
+  );
+
+  const referencia =
+    Array.from(
+      principal().querySelectorAll(
+        "button"
+      )
+    ).find(
+      b => b.textContent ===
+        "Exportar para Gestor Policial (cifrado)"
+    );
+
+  if (referencia) {
+    referencia.after(caja);
+  } else {
+    principal().append(caja);
+  }
+
+  caja.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
 async function guardarActual() {
-  if (!comprobarAcceso() || !actuacion) return;
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return;
+  }
 
   try {
     leer();
 
     if (
-      !String(actuacion.referencia || "").trim()
+      !String(
+        actuacion.referencia || ""
+      ).trim()
     ) {
       throw Error(
-        "Introduce una referencia para la actuación."
+        "Introduce una referencia " +
+        "para la actuación."
       );
     }
 
-    const id = await Almacenamiento.guardar(
-      actuacion
-    );
+    const id =
+      await Almacenamiento.guardar(
+        actuacion
+      );
 
+    descartarArchivoPreparado();
     marcarGuardado();
 
     alert(
       "Actuación guardada correctamente.\n\n" +
-      "Referencia: " + actuacion.referencia +
+      "Referencia: " +
+      actuacion.referencia +
       "\nID: " + id
     );
 
@@ -771,10 +1175,15 @@ function resumen() {
 
   leer();
 
-  let p = document.getElementById("resumen");
+  let p =
+    document.getElementById(
+      "resumen"
+    );
 
   if (!p) {
-    p = document.createElement("pre");
+    p =
+      document.createElement("pre");
+
     p.id = "resumen";
 
     p.style.cssText = [
@@ -806,6 +1215,8 @@ function bloquear() {
   cambiosPendientes = false;
   estadoGuardado = "";
 
+  descartarArchivoPreparado();
+
   Almacenamiento.bloquear();
   acceso();
 }
@@ -815,9 +1226,12 @@ async function acceso() {
   titulo("Acceso a Filiaciones");
 
   try {
-    const existe = await Almacenamiento.existe();
+    const existe =
+      await Almacenamiento.existe();
 
-    const p = document.createElement("input");
+    const p =
+      document.createElement("input");
+
     p.type = "password";
     p.autocomplete = "off";
 
@@ -838,16 +1252,24 @@ async function acceso() {
     let confirmar = null;
 
     if (!existe) {
-      confirmar = document.createElement("input");
+      confirmar =
+        document.createElement("input");
+
       confirmar.type = "password";
       confirmar.autocomplete = "off";
-      confirmar.placeholder = "Repite la contraseña";
-      confirmar.style.cssText = p.style.cssText;
+      confirmar.placeholder =
+        "Repite la contraseña";
+
+      confirmar.style.cssText =
+        p.style.cssText;
+
       principal().append(confirmar);
     }
 
     boton(
-      existe ? "Desbloquear" : "Crear contraseña",
+      existe
+        ? "Desbloquear"
+        : "Crear contraseña",
       async () => {
         try {
           if (existe) {
@@ -855,7 +1277,10 @@ async function acceso() {
               p.value
             );
           } else {
-            if (p.value !== confirmar.value) {
+            if (
+              p.value !==
+              confirmar.value
+            ) {
               throw Error(
                 "Las contraseñas no coinciden."
               );
@@ -899,18 +1324,28 @@ function menu() {
   cambiosPendientes = false;
   estadoGuardado = "";
 
+  descartarArchivoPreparado();
+
   limpiar();
 
-  titulo("Filiaciones — acceso desbloqueado");
+  titulo(
+    "Filiaciones — acceso desbloqueado"
+  );
 
-  boton("Nueva actuación", nuevaActuacion);
+  boton(
+    "Nueva actuación",
+    nuevaActuacion
+  );
 
   boton(
     "Consultar actuaciones guardadas",
     consultar
   );
 
-  boton("Bloquear aplicación", bloquear);
+  boton(
+    "Bloquear aplicación",
+    bloquear
+  );
 
   aviso(
     "Prototipo: no verificado para " +
@@ -924,22 +1359,28 @@ async function consultar() {
   actuacion = null;
   cambiosPendientes = false;
 
+  descartarArchivoPreparado();
+
   limpiar();
   titulo("Actuaciones guardadas");
 
   try {
-    const lista = await Almacenamiento.listar();
+    const lista =
+      await Almacenamiento.listar();
 
     if (!Almacenamiento.desbloqueado()) {
       return acceso();
     }
 
     if (!lista.length) {
-      aviso("No hay actuaciones guardadas.");
+      aviso(
+        "No hay actuaciones guardadas."
+      );
     }
 
     for (const registro of lista) {
-      const s = document.createElement("section");
+      const s =
+        document.createElement("section");
 
       s.style.cssText =
         "padding:12px;" +
@@ -949,7 +1390,10 @@ async function consultar() {
 
       aviso(
         "Referencia: " +
-        (registro.referencia || "(sin referencia)") +
+        (
+          registro.referencia ||
+          "(sin referencia)"
+        ) +
         " — " +
         (registro.fecha || ""),
         s
@@ -958,6 +1402,7 @@ async function consultar() {
       boton(
         "Abrir y editar",
         () => {
+          descartarArchivoPreparado();
           actuacion = normalizar(registro);
           marcarGuardado();
           dibujar();
@@ -970,10 +1415,11 @@ async function consultar() {
         async () => {
           if (
             !confirm(
-              "¿Eliminar definitivamente esta " +
-              "actuación de prueba?\n\n" +
-              "Esta operación no se puede deshacer " +
-              "sin una copia de seguridad."
+              "¿Eliminar definitivamente " +
+              "esta actuación de prueba?\n\n" +
+              "Esta operación no se puede " +
+              "deshacer sin una copia " +
+              "de seguridad."
             )
           ) {
             return;
@@ -1000,8 +1446,15 @@ async function consultar() {
     error(e);
   }
 
-  boton("Volver al menú", menu);
-  boton("Bloquear aplicación", bloquear);
+  boton(
+    "Volver al menú",
+    menu
+  );
+
+  boton(
+    "Bloquear aplicación",
+    bloquear
+  );
 }
 
 window.mostrar = function(nombre) {
@@ -1009,11 +1462,18 @@ window.mostrar = function(nombre) {
     return acceso();
   }
 
-  if (actuacion && !confirmarSalida()) {
+  if (
+    actuacion &&
+    !confirmarSalida()
+  ) {
     return;
   }
 
-  if (nombre === "Nueva actuación") {
+  descartarArchivoPreparado();
+
+  if (
+    nombre === "Nueva actuación"
+  ) {
     nuevaActuacion();
 
   } else if (
@@ -1022,11 +1482,16 @@ window.mostrar = function(nombre) {
     consultar();
 
   } else {
-    alert(nombre + ": módulo pendiente.");
+    alert(
+      nombre +
+      ": módulo pendiente."
+    );
   }
 };
 
-if (document.readyState === "loading") {
+if (
+  document.readyState === "loading"
+) {
   document.addEventListener(
     "DOMContentLoaded",
     acceso
