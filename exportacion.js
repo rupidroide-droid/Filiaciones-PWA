@@ -1,21 +1,14 @@
 
-/*
- * FILIACIONES - EXPORTACIÓN
- * Beta 0.9.10
- *
- * 1. Ficha Word (.docx)
- * 2. Intercambio cifrado para Gestor Policial
- *
- * No genera diligencias.
- * No asigna palabras clave policiales.
- *
- * PROTOTIPO: SOLO DATOS FICTICIOS.
- */
 "use strict";
 
-window.Exportacion = (() => {
+/*
+ * FILIACIONES - EXPORTACIÓN
+ * Beta 0.9.11
+ * PROTOTIPO: solo datos ficticios.
+ */
 
-  const encoder = new TextEncoder();
+window.Exportacion = (() => {
+  const enc = new TextEncoder();
 
   const MIME_DOCX =
     "application/vnd.openxmlformats-officedocument." +
@@ -57,379 +50,190 @@ window.Exportacion = (() => {
     ]
   };
 
-  function valor(dato) {
-    return dato == null
-      ? ""
-      : String(dato).trim();
-  }
+  const valor = x =>
+    x == null ? "" : String(x).trim();
 
-  function fecha(dato) {
-    const texto = valor(dato);
+  const fecha = x => {
+    const v = valor(x);
+    const m =
+      /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
 
-    const partes =
-      /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+    return m
+      ? `${m[3]}/${m[2]}/${m[1]}`
+      : v;
+  };
 
-    return partes
-      ? partes[3] + "/" +
-        partes[2] + "/" +
-        partes[1]
-      : texto;
-  }
+  const xml = x => String(x)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 
-  function xml(texto) {
-    return String(texto)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
-  }
-
-  function nombreSeguro(texto) {
-    return valor(texto)
+  const nombreSeguro = x =>
+    valor(x)
       .replace(/[\\/:*?"<>|]/g, "_")
       .replace(/\s+/g, "_")
       .slice(0, 60) ||
-      "Sin_referencia";
+    "Sin_referencia";
+
+  function validar(a) {
+    if (
+      !a ||
+      typeof a !== "object" ||
+      Array.isArray(a) ||
+      !valor(a.referencia)
+    ) {
+      throw Error(
+        "La actuación necesita una referencia válida."
+      );
+    }
   }
 
-  function listas(actuacion) {
+  function listas(a) {
     return {
-      personas: Array.isArray(actuacion.personas)
-        ? actuacion.personas
-        : [],
-      vehiculos: Array.isArray(actuacion.vehiculos)
-        ? actuacion.vehiculos
-        : [],
-      objetos: Array.isArray(actuacion.objetos)
-        ? actuacion.objetos
-        : []
+      personas: Array.isArray(a.personas)
+        ? a.personas : [],
+      vehiculos: Array.isArray(a.vehiculos)
+        ? a.vehiculos : [],
+      objetos: Array.isArray(a.objetos)
+        ? a.objetos : []
     };
   }
 
-  function personasVinculadas(vehiculo, personas) {
-    const resultado = [];
+  function fichaCompacta(a) {
+    validar(a);
 
-    const vinculos =
-      Array.isArray(vehiculo.vinculos)
-        ? vehiculo.vinculos
-        : [];
-
-    for (const vinculo of vinculos) {
-      const indice = personas.findIndex(
-        persona =>
-          persona.idPersona === vinculo.personaId
-      );
-
-      if (indice < 0) continue;
-
-      const persona = personas[indice];
-
-      const nombre =
-        valor(persona.nombre) ||
-        "Persona " + (indice + 1);
-
-      const funcion =
-        valor(vinculo.rol) ||
-        "Sin especificar";
-
-      resultado.push(
-        nombre + " (" + funcion + ")"
-      );
-    }
-
-    return resultado;
-  }
-
-  function vehiculosVinculados(persona, vehiculos) {
-    const resultado = [];
-
-    vehiculos.forEach((vehiculo, indice) => {
-      const vinculos =
-        Array.isArray(vehiculo.vinculos)
-          ? vehiculo.vinculos
-          : [];
-
-      for (const vinculo of vinculos) {
-        if (
-          vinculo.personaId !==
-          persona.idPersona
-        ) {
-          continue;
-        }
-
-        const identificacion =
-          valor(vehiculo.matricula) ||
-          "Vehículo " + (indice + 1);
-
-        resultado.push(
-          identificacion +
-          " (" +
-          (valor(vinculo.rol) ||
-            "Sin especificar") +
-          ")"
-        );
-      }
-    });
-
-    return resultado;
-  }
-
-  function campoDocumento(nombre, dato, etiqueta) {
-    let contenido = valor(dato);
-
-    if (nombre === "fechaNacimiento") {
-      contenido = fecha(dato);
-    }
-
-    if (!contenido) return null;
-
-    return {
-      tipo: "campo",
-      texto: etiqueta + ": " + contenido
-    };
-  }
-
-  function fichaCompacta(actuacion) {
     const {
       personas,
       vehiculos,
       objetos
-    } = listas(actuacion);
+    } = listas(a);
 
-    const parrafos = [];
-
-    parrafos.push({
-      tipo: "titulo",
-      texto: "FICHA DE FILIACIÓN Y ACTUACIÓN"
-    });
-
-    parrafos.push({
-      tipo: "seccion",
-      texto: "DATOS GENERALES"
-    });
-
-    const generales = [
-      [
-        "referencia",
-        "Referencia de actuación"
-      ],
-      [
-        "numeroAtestado",
-        "Número de atestado"
-      ],
-      ["fecha", "Fecha"],
-      ["hora", "Hora"],
-      ["lugar", "Lugar"],
-      [
-        "agentes",
-        "Agentes intervinientes"
-      ]
+    const p = [
+      {
+        tipo: "titulo",
+        texto: "FICHA DE FILIACIÓN Y ACTUACIÓN"
+      },
+      {
+        tipo: "seccion",
+        texto: "DATOS GENERALES"
+      }
     ];
 
-    for (const [nombre, etiqueta] of generales) {
-      const dato =
-        nombre === "fecha"
-          ? fecha(actuacion[nombre])
-          : actuacion[nombre];
-
-      const campo =
-        campoDocumento(nombre, dato, etiqueta);
-
-      if (campo) parrafos.push(campo);
-    }
-
-    personas.forEach((persona, indice) => {
-      parrafos.push({
-        tipo: "seccion",
-        texto: "PERSONA " + (indice + 1)
-      });
-
-      for (
-        const [nombre, etiqueta]
-        of CAMPOS.personas
-      ) {
-        const campo = campoDocumento(
-          nombre,
-          persona[nombre],
-          etiqueta
-        );
-
-        if (campo) parrafos.push(campo);
-      }
-
-      const vinculados =
-        vehiculosVinculados(persona, vehiculos);
-
-      if (vinculados.length) {
-        parrafos.push({
+    const poner = (etiqueta, v) => {
+      if (valor(v)) {
+        p.push({
           tipo: "campo",
-          texto:
-            "Vehículos vinculados: " +
-            vinculados.join("; ")
+          texto: `${etiqueta}: ${valor(v)}`
         });
       }
-    });
-
-    vehiculos.forEach((vehiculo, indice) => {
-      parrafos.push({
-        tipo: "seccion",
-        texto: "VEHÍCULO " + (indice + 1)
-      });
-
-      for (
-        const [nombre, etiqueta]
-        of CAMPOS.vehiculos
-      ) {
-        const campo = campoDocumento(
-          nombre,
-          vehiculo[nombre],
-          etiqueta
-        );
-
-        if (campo) parrafos.push(campo);
-      }
-
-      const vinculados =
-        personasVinculadas(vehiculo, personas);
-
-      if (vinculados.length) {
-        parrafos.push({
-          tipo: "campo",
-          texto:
-            "Personas vinculadas: " +
-            vinculados.join("; ")
-        });
-      }
-    });
-
-    objetos.forEach((objeto, indice) => {
-      parrafos.push({
-        tipo: "seccion",
-        texto: "OBJETO " + (indice + 1)
-      });
-
-      for (
-        const [nombre, etiqueta]
-        of CAMPOS.objetos
-      ) {
-        const campo = campoDocumento(
-          nombre,
-          objeto[nombre],
-          etiqueta
-        );
-
-        if (campo) parrafos.push(campo);
-      }
-    });
-
-    return parrafos;
-  }
-
-  function parrafoXML(parrafo) {
-    const estilos = {
-      titulo: "TituloFicha",
-      seccion: "SeccionFicha",
-      campo: "CampoFicha"
     };
 
-    const estilo =
-      estilos[parrafo.tipo] ||
-      "CampoFicha";
+    [
+      ["Referencia de actuación", a.referencia],
+      ["Número de atestado", a.numeroAtestado],
+      ["Fecha", fecha(a.fecha)],
+      ["Hora", a.hora],
+      ["Lugar", a.lugar],
+      ["Agentes intervinientes", a.agentes]
+    ].forEach(([e, v]) => poner(e, v));
 
-    return (
-      "<w:p>" +
-      "<w:pPr>" +
-      '<w:pStyle w:val="' +
-      estilo +
-      '"/>' +
-      "</w:pPr>" +
-      "<w:r>" +
-      '<w:t xml:space="preserve">' +
-      xml(parrafo.texto) +
-      "</w:t>" +
-      "</w:r>" +
-      "</w:p>"
-    );
-  }
+    personas.forEach((persona, i) => {
+      p.push({
+        tipo: "seccion",
+        texto: `PERSONA ${i + 1}`
+      });
 
-  function documentoXML(parrafos) {
-    return (
-      '<?xml version="1.0" encoding="UTF-8" ' +
-      'standalone="yes"?>' +
-      '<w:document xmlns:w="' +
-      'http://schemas.openxmlformats.org/' +
-      'wordprocessingml/2006/main">' +
-      "<w:body>" +
-      parrafos.map(parrafoXML).join("") +
-      "<w:sectPr>" +
-      '<w:pgSz w:w="11906" w:h="16838"/>' +
-      '<w:pgMar w:top="1134" ' +
-      'w:right="1134" w:bottom="1134" ' +
-      'w:left="1134"/>' +
-      "</w:sectPr>" +
-      "</w:body></w:document>"
-    );
-  }
+      CAMPOS.personas.forEach(([k, e]) => {
+        poner(
+          e,
+          k === "fechaNacimiento"
+            ? fecha(persona[k])
+            : persona[k]
+        );
+      });
 
-  function estilosXML() {
-    return (
-      '<?xml version="1.0" encoding="UTF-8"?>' +
-      '<w:styles xmlns:w="' +
-      'http://schemas.openxmlformats.org/' +
-      'wordprocessingml/2006/main">' +
+      const relaciones = [];
 
-      '<w:style w:type="paragraph" ' +
-      'w:default="1" w:styleId="Normal">' +
-      '<w:name w:val="Normal"/>' +
-      '<w:rPr>' +
-      '<w:rFonts w:ascii="Aptos" ' +
-      'w:hAnsi="Aptos"/>' +
-      '<w:sz w:val="21"/>' +
-      '</w:rPr></w:style>' +
+      vehiculos.forEach((v, j) => {
+        const vinculos =
+          Array.isArray(v.vinculos)
+            ? v.vinculos : [];
 
-      '<w:style w:type="paragraph" ' +
-      'w:styleId="TituloFicha">' +
-      '<w:name w:val="Título ficha"/>' +
-      '<w:pPr><w:spacing w:after="240"/>' +
-      '<w:keepNext/></w:pPr>' +
-      '<w:rPr><w:b/><w:sz w:val="30"/>' +
-      '</w:rPr></w:style>' +
+        vinculos.forEach(r => {
+          if (
+            r.personaId === persona.idPersona
+          ) {
+            const identificacion =
+              valor(v.matricula) ||
+              `Vehículo ${j + 1}`;
 
-      '<w:style w:type="paragraph" ' +
-      'w:styleId="SeccionFicha">' +
-      '<w:name w:val="Sección ficha"/>' +
-      '<w:pPr><w:spacing w:before="220" ' +
-      'w:after="100"/><w:keepNext/>' +
-      '</w:pPr>' +
-      '<w:rPr><w:b/><w:sz w:val="23"/>' +
-      '</w:rPr></w:style>' +
+            relaciones.push(
+              `${identificacion} (` +
+              `${valor(r.rol) || "Sin especificar"})`
+            );
+          }
+        });
+      });
 
-      '<w:style w:type="paragraph" ' +
-      'w:styleId="CampoFicha">' +
-      '<w:name w:val="Campo ficha"/>' +
-      '<w:pPr><w:spacing w:after="55"/>' +
-      '</w:pPr>' +
-      '<w:rPr><w:sz w:val="20"/>' +
-      '</w:rPr></w:style>' +
+      poner(
+        "Vehículos vinculados",
+        relaciones.join("; ")
+      );
+    });
 
-      "</w:styles>"
-    );
-  }
+    vehiculos.forEach((v, i) => {
+      p.push({
+        tipo: "seccion",
+        texto: `VEHÍCULO ${i + 1}`
+      });
 
-  function crc32(datos) {
-    let crc = 0xFFFFFFFF;
+      CAMPOS.vehiculos.forEach(([k, e]) => {
+        poner(e, v[k]);
+      });
 
-    for (const byte of datos) {
-      crc ^= byte;
+      const vinculos =
+        Array.isArray(v.vinculos)
+          ? v.vinculos : [];
 
-      for (let i = 0; i < 8; i++) {
-        crc = (crc >>> 1) ^
-          ((crc & 1) ? 0xEDB88320 : 0);
-      }
-    }
+      const relaciones = vinculos
+        .map(r => {
+          const j = personas.findIndex(
+            x => x.idPersona === r.personaId
+          );
 
-    return (crc ^ 0xFFFFFFFF) >>> 0;
+          if (j < 0) return null;
+
+          const nombre =
+            valor(personas[j].nombre) ||
+            `Persona ${j + 1}`;
+
+          return (
+            `${nombre} (` +
+            `${valor(r.rol) || "Sin especificar"})`
+          );
+        })
+        .filter(Boolean);
+
+      poner(
+        "Personas vinculadas",
+        relaciones.join("; ")
+      );
+    });
+
+    objetos.forEach((o, i) => {
+      p.push({
+        tipo: "seccion",
+        texto: `OBJETO ${i + 1}`
+      });
+
+      CAMPOS.objetos.forEach(([k, e]) => {
+        poner(e, o[k]);
+      });
+    });
+
+    return p;
   }
 
   function u16(n) {
@@ -448,35 +252,50 @@ window.Exportacion = (() => {
     ];
   }
 
-  function unir(partes) {
-    const total = partes.reduce(
-      (n, parte) => n + parte.length,
-      0
+  function juntar(partes) {
+    const a = new Uint8Array(
+      partes.reduce(
+        (n, x) => n + x.length,
+        0
+      )
     );
 
-    const salida = new Uint8Array(total);
-    let posicion = 0;
+    let i = 0;
 
-    for (const parte of partes) {
-      salida.set(parte, posicion);
-      posicion += parte.length;
+    for (const x of partes) {
+      a.set(x, i);
+      i += x.length;
     }
 
-    return salida;
+    return a;
   }
 
-  function crearZIP(archivos) {
+  function crc32(a) {
+    let c = 0xffffffff;
+
+    for (const b of a) {
+      c ^= b;
+
+      for (let i = 0; i < 8; i++) {
+        c = (c >>> 1) ^
+          ((c & 1) ? 0xedb88320 : 0);
+      }
+    }
+
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function zip(archivos) {
     const locales = [];
     const centrales = [];
-
     let desplazamiento = 0;
 
     for (const [nombre, contenido] of archivos) {
-      const n = encoder.encode(nombre);
-      const d = encoder.encode(contenido);
+      const n = enc.encode(nombre);
+      const d = enc.encode(contenido);
       const crc = crc32(d);
 
-      const local = Uint8Array.from([
+      const l = Uint8Array.from([
         ...u32(0x04034b50),
         ...u16(20),
         ...u16(0),
@@ -490,9 +309,9 @@ window.Exportacion = (() => {
         ...u16(0)
       ]);
 
-      locales.push(local, n, d);
+      locales.push(l, n, d);
 
-      const central = Uint8Array.from([
+      const c = Uint8Array.from([
         ...u32(0x02014b50),
         ...u16(20),
         ...u16(20),
@@ -511,33 +330,31 @@ window.Exportacion = (() => {
         ...u32(desplazamiento)
       ]);
 
-      centrales.push(central, n);
+      centrales.push(c, n);
 
       desplazamiento +=
-        local.length + n.length + d.length;
+        l.length + n.length + d.length;
     }
 
-    const directorio = unir(centrales);
+    const dir = juntar(centrales);
 
-    const final = Uint8Array.from([
-      ...u32(0x06054b50),
-      ...u16(0),
-      ...u16(0),
-      ...u16(archivos.length),
-      ...u16(archivos.length),
-      ...u32(directorio.length),
-      ...u32(desplazamiento),
-      ...u16(0)
-    ]);
-
-    return unir([
+    return juntar([
       ...locales,
-      directorio,
-      final
+      dir,
+      Uint8Array.from([
+        ...u32(0x06054b50),
+        ...u16(0),
+        ...u16(0),
+        ...u16(archivos.length),
+        ...u16(archivos.length),
+        ...u32(dir.length),
+        ...u32(desplazamiento),
+        ...u16(0)
+      ])
     ]);
   }
 
-  function crearDocx(parrafos) {
+  function docx(p) {
     const tipos =
       '<?xml version="1.0" encoding="UTF-8"?>' +
       '<Types xmlns="' +
@@ -565,10 +382,11 @@ window.Exportacion = (() => {
       '<Relationship Id="rId1" Type="' +
       'http://schemas.openxmlformats.org/' +
       'officeDocument/2006/relationships/' +
-      'officeDocument" Target="word/document.xml"/>' +
+      'officeDocument" ' +
+      'Target="word/document.xml"/>' +
       '</Relationships>';
 
-    const word =
+    const relaciones =
       '<?xml version="1.0" encoding="UTF-8"?>' +
       '<Relationships xmlns="' +
       'http://schemas.openxmlformats.org/' +
@@ -579,120 +397,137 @@ window.Exportacion = (() => {
       'Target="styles.xml"/>' +
       '</Relationships>';
 
-    return crearZIP([
+    const estilos =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<w:styles xmlns:w="' +
+      'http://schemas.openxmlformats.org/' +
+      'wordprocessingml/2006/main">' +
+      '<w:style w:type="paragraph" ' +
+      'w:default="1" w:styleId="Normal">' +
+      '<w:name w:val="Normal"/>' +
+      '<w:rPr><w:rFonts w:ascii="Aptos" ' +
+      'w:hAnsi="Aptos"/>' +
+      '<w:sz w:val="21"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="TituloFicha">' +
+      '<w:name w:val="Título ficha"/>' +
+      '<w:pPr><w:spacing w:after="240"/>' +
+      '<w:keepNext/></w:pPr>' +
+      '<w:rPr><w:b/><w:sz w:val="30"/>' +
+      '</w:rPr></w:style>' +
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="SeccionFicha">' +
+      '<w:name w:val="Sección ficha"/>' +
+      '<w:pPr><w:spacing w:before="220" ' +
+      'w:after="100"/><w:keepNext/></w:pPr>' +
+      '<w:rPr><w:b/><w:sz w:val="23"/>' +
+      '</w:rPr></w:style>' +
+      '<w:style w:type="paragraph" ' +
+      'w:styleId="CampoFicha">' +
+      '<w:name w:val="Campo ficha"/>' +
+      '<w:pPr><w:spacing w:after="55"/>' +
+      '</w:pPr><w:rPr><w:sz w:val="20"/>' +
+      '</w:rPr></w:style>' +
+      '</w:styles>';
+
+    const cuerpo = p.map(x => {
+      const estilo =
+        x.tipo === "titulo"
+          ? "TituloFicha"
+          : x.tipo === "seccion"
+            ? "SeccionFicha"
+            : "CampoFicha";
+
+      return (
+        '<w:p><w:pPr><w:pStyle w:val="' +
+        estilo +
+        '"/></w:pPr><w:r><w:t ' +
+        'xml:space="preserve">' +
+        xml(x.texto) +
+        '</w:t></w:r></w:p>'
+      );
+    }).join("");
+
+    const documento =
+      '<?xml version="1.0" encoding="UTF-8" ' +
+      'standalone="yes"?>' +
+      '<w:document xmlns:w="' +
+      'http://schemas.openxmlformats.org/' +
+      'wordprocessingml/2006/main">' +
+      '<w:body>' +
+      cuerpo +
+      '<w:sectPr>' +
+      '<w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:pgMar w:top="1134" ' +
+      'w:right="1134" w:bottom="1134" ' +
+      'w:left="1134"/>' +
+      '</w:sectPr></w:body></w:document>';
+
+    return zip([
       ["[Content_Types].xml", tipos],
       ["_rels/.rels", raiz],
-      [
-        "word/document.xml",
-        documentoXML(parrafos)
-      ],
-      ["word/styles.xml", estilosXML()],
+      ["word/document.xml", documento],
+      ["word/styles.xml", estilos],
       [
         "word/_rels/document.xml.rels",
-        word
+        relaciones
       ]
     ]);
   }
 
-  async function compartir(archivo) {
+  function entregar(archivo) {
     if (
-      navigator.canShare &&
       navigator.share &&
+      navigator.canShare &&
       navigator.canShare({
         files: [archivo]
       })
     ) {
-      await navigator.share({
+      return navigator.share({
         files: [archivo],
         title: archivo.name
       });
-
-      return;
     }
 
-    const url =
-      URL.createObjectURL(archivo);
+    const url = URL.createObjectURL(archivo);
+    const a = document.createElement("a");
 
-    const enlace =
-      document.createElement("a");
+    a.href = url;
+    a.download = archivo.name;
 
-    enlace.href = url;
-    enlace.download = archivo.name;
-
-    document.body.append(enlace);
-    enlace.click();
-    enlace.remove();
+    document.body.append(a);
+    a.click();
+    a.remove();
 
     setTimeout(
       () => URL.revokeObjectURL(url),
       60000
     );
+
+    return Promise.resolve();
   }
 
-  function comprobarActuacion(actuacion) {
-    if (
-      !actuacion ||
-      typeof actuacion !== "object" ||
-      Array.isArray(actuacion)
-    ) {
-      throw Error(
-        "No hay una actuación válida."
-      );
-    }
-
-    if (!valor(actuacion.referencia)) {
-      throw Error(
-        "La actuación necesita una referencia."
-      );
-    }
-  }
-
-  async function exportarFicha(actuacion) {
-    comprobarActuacion(actuacion);
-
-    const parrafos =
-      fichaCompacta(actuacion);
-
-    const datos = crearDocx(parrafos);
-
-    const nombre =
-      "Ficha_" +
-      nombreSeguro(actuacion.referencia) +
-      ".docx";
+  async function exportarFicha(a) {
+    validar(a);
 
     const archivo = new File(
-      [datos],
-      nombre,
+      [docx(fichaCompacta(a))],
+      `Ficha_${nombreSeguro(a.referencia)}.docx`,
       {type: MIME_DOCX}
     );
 
-    await compartir(archivo);
+    return entregar(archivo);
   }
 
-  function aBase64(datos) {
-    let binario = "";
+  function prepararIntercambio(a) {
+    validar(a);
 
-    for (const byte of datos) {
-      binario += String.fromCharCode(byte);
-    }
+    const copia = structuredClone(a);
+    const l = listas(copia);
 
-    return btoa(binario);
-  }
-
-  function prepararIntercambio(actuacion) {
-    comprobarActuacion(actuacion);
-
-    const copia = structuredClone(actuacion);
-
-    const {
-      personas,
-      vehiculos,
-      objetos
-    } = listas(copia);
-
-    copia.personas = personas;
-    copia.vehiculos = vehiculos;
-    copia.objetos = objetos;
+    copia.personas = l.personas;
+    copia.vehiculos = l.vehiculos;
+    copia.objetos = l.objetos;
 
     return {
       formato: "filiaciones-gestor-policial",
@@ -705,14 +540,40 @@ window.Exportacion = (() => {
     };
   }
 
-  async function cifrarIntercambio(datos, clave) {
+  function base64(a) {
+    let s = "";
+
+    for (const b of a) {
+      s += String.fromCharCode(b);
+    }
+
+    return btoa(s);
+  }
+
+  async function prepararArchivoGestor(
+    a,
+    clave
+  ) {
+    validar(a);
+
     if (
-      !crypto?.subtle ||
+      typeof clave !== "string" ||
+      clave.length < 12
+    ) {
+      throw Error(
+        "La contraseña debe tener " +
+        "al menos 12 caracteres."
+      );
+    }
+
+    if (
+      !globalThis.crypto ||
+      !crypto.subtle ||
       !crypto.getRandomValues
     ) {
       throw Error(
-        "Este dispositivo no permite " +
-        "realizar la exportación cifrada."
+        "El cifrado no está disponible " +
+        "en este contexto."
       );
     }
 
@@ -724,18 +585,18 @@ window.Exportacion = (() => {
       new Uint8Array(12)
     );
 
+    const iteraciones = 310000;
+
     const material =
       await crypto.subtle.importKey(
         "raw",
-        encoder.encode(clave),
+        enc.encode(clave),
         "PBKDF2",
         false,
         ["deriveKey"]
       );
 
-    const iteraciones = 310000;
-
-    const claveAES =
+    const llave =
       await crypto.subtle.deriveKey(
         {
           name: "PBKDF2",
@@ -752,136 +613,95 @@ window.Exportacion = (() => {
         ["encrypt"]
       );
 
-    const texto = encoder.encode(
-      JSON.stringify(datos)
+    const datos = enc.encode(
+      JSON.stringify(
+        prepararIntercambio(a)
+      )
     );
 
-    const cifrado =
+    const cifrado = new Uint8Array(
       await crypto.subtle.encrypt(
         {
           name: "AES-GCM",
           iv
         },
-        claveAES,
-        texto
-      );
+        llave,
+        datos
+      )
+    );
 
-    return {
+    const contenedor = {
       formato:
         "filiaciones-intercambio-cifrado",
       version: 1,
       cifrado: "AES-256-GCM",
       derivacion: "PBKDF2-SHA256",
       iteraciones,
-      sal: aBase64(sal),
-      iv: aBase64(iv),
-      datos: aBase64(
-        new Uint8Array(cifrado)
-      )
+      sal: base64(sal),
+      iv: base64(iv),
+      datos: base64(cifrado)
     };
-  }
 
-  async function exportarGestorPolicial(
-    actuacion
-  ) {
-    comprobarActuacion(actuacion);
-
-    const primera = prompt(
-      "Contraseña para el archivo de " +
-      "intercambio cifrado.\n\n" +
-      "Debe tener al menos 12 caracteres.\n" +
-      "No tiene que ser la contraseña " +
-      "de Filiaciones."
-    );
-
-    if (primera === null) return;
-
-    if (primera.length < 12) {
-      throw Error(
-        "La contraseña debe tener " +
-        "al menos 12 caracteres."
-      );
-    }
-
-    const segunda = prompt(
-      "Repite la contraseña del " +
-      "archivo de intercambio."
-    );
-
-    if (segunda === null) return;
-
-    if (primera !== segunda) {
-      throw Error(
-        "Las contraseñas no coinciden."
-      );
-    }
-
-    const intercambio =
-      prepararIntercambio(actuacion);
-
-    const protegido =
-      await cifrarIntercambio(
-        intercambio,
-        primera
-      );
-
-    const contenido =
-      JSON.stringify(protegido, null, 2);
-
-    const nombre =
-      "GestorPolicial_" +
-      nombreSeguro(actuacion.referencia) +
-      ".gpenc";
-
-    const archivo = new File(
-      [contenido],
-      nombre,
+    return new File(
+      [
+        JSON.stringify(
+          contenedor,
+          null,
+          2
+        )
+      ],
+      `GestorPolicial_${
+        nombreSeguro(a.referencia)
+      }.gpenc`,
       {
         type: "application/octet-stream"
       }
     );
-
-    await compartir(archivo);
   }
 
-  /*
-   * Compatibilidad con app.js Beta 0.9.9.
-   *
-   * exportar(a, "ficha") mantiene Word.
-   * exportar(a, "diligencia") ya no genera
-   * una diligencia: genera intercambio.
-   *
-   * En el siguiente paso cambiaremos
-   * el texto del botón en app.js.
-   */
+  function compartirArchivoPreparado(archivo) {
+    if (
+      !(archivo instanceof File) ||
+      !archivo.name.endsWith(".gpenc")
+    ) {
+      throw Error(
+        "Archivo de intercambio no válido."
+      );
+    }
+
+    return entregar(archivo);
+  }
+
   async function exportar(
-    actuacion,
+    a,
     formato = "ficha"
   ) {
     if (formato === "ficha") {
-      return exportarFicha(actuacion);
+      return exportarFicha(a);
     }
 
     if (
       formato === "gestor" ||
       formato === "diligencia"
     ) {
-      return exportarGestorPolicial(
-        actuacion
+      throw Error(
+        "Para el intercambio cifrado " +
+        "utiliza el formulario de exportación " +
+        "de la Beta 0.9.11."
       );
     }
 
     throw Error(
-      "Formato de exportación desconocido."
+      "Formato desconocido."
     );
   }
 
   return {
     exportar,
     exportarFicha,
-    exportarGestorPolicial,
-    fichaCompacta,
-    prepararIntercambio
+    prepararArchivoGestor,
+    compartirArchivoPreparado,
+    prepararIntercambio,
+    fichaCompacta
   };
-
 })();
