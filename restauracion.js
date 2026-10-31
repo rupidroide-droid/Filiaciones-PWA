@@ -3,10 +3,10 @@
 
 /*
  * FILIACIONES - RESTAURACIÓN SEGURA
- * Beta 0.9.2
+ * Beta 0.9.5
  *
- * Descifra copias, detecta duplicados
- * y exige confirmación para importar.
+ * Diagnóstico detallado de errores.
+ * No sobrescribe registros existentes.
  */
 
 const Restauracion = (() => {
@@ -170,6 +170,7 @@ const Restauracion = (() => {
     }
 
     const actuales = await Almacenamiento.listar();
+
     const idsActuales = new Set(
       actuales.map(a => a.id)
     );
@@ -246,7 +247,8 @@ const Restauracion = (() => {
     const resultado = {
       importadas: 0,
       duplicadas: 0,
-      errores: 0
+      errores: 0,
+      detalles: []
     };
 
     try {
@@ -259,11 +261,22 @@ const Restauracion = (() => {
         }
 
         try {
+          if (
+            typeof Almacenamiento.importarSeguro !==
+            "function"
+          ) {
+            throw Error(
+              "importarSeguro no está disponible " +
+              "en almacenamiento.js"
+            );
+          }
+
           await Almacenamiento.importarSeguro(
             item.datos
           );
 
           resultado.importadas++;
+
         } catch (error) {
           if (
             error?.name === "ConstraintError" ||
@@ -273,11 +286,32 @@ const Restauracion = (() => {
             resultado.duplicadas++;
           } else {
             resultado.errores++;
+
+            const detalle =
+              (error?.name || "Error") +
+              ": " +
+              (error?.message || String(error));
+
+            resultado.detalles.push(detalle);
           }
         }
       }
 
+      if (resultado.errores > 0) {
+        throw Error(
+          "Importadas: " +
+          resultado.importadas +
+          ". Duplicadas: " +
+          resultado.duplicadas +
+          ". Errores: " +
+          resultado.errores +
+          ".\nDetalle: " +
+          resultado.detalles.join("\n")
+        );
+      }
+
       return resultado;
+
     } finally {
       limpiar();
     }
