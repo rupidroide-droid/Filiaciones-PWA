@@ -3,8 +3,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#17365d">
+
   <title>Filiaciones</title>
 
   <style>
@@ -41,6 +43,11 @@
       cursor: pointer;
     }
 
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     h1 {
       margin: 0;
     }
@@ -61,32 +68,12 @@
   <main>
     <h2>Menú principal</h2>
 
-    <button onclick="mostrar('Nueva actuación')">
-      Nueva actuación
-    </button>
-
-    <button onclick="mostrar('Personas')">
-      Identificar persona
-    </button>
-
-    <button onclick="mostrar('Vehículos')">
-      Identificar vehículo
-    </button>
-
-    <button onclick="mostrar('Objetos')">
-      Identificar objeto
-    </button>
-
-    <button onclick="mostrar('Actuaciones')">
-      Consultar actuaciones
-    </button>
-
-    <p id="estado">
-      Versión de pruebas. No introduzcas datos reales.
+    <p>
+      Cargando aplicación...
     </p>
   </main>
 
-  <!-- Almacenamiento cifrado existente -->
+  <!-- Almacenamiento cifrado -->
   <script src="./almacenamiento.js"></script>
 
   <!-- Aplicación principal -->
@@ -98,8 +85,14 @@
   <!-- Copias de seguridad cifradas -->
   <script src="./copias.js?v=080"></script>
 
-  <!-- Botón de copias controlado por sesión -->
+  <!-- Botón de copias -->
   <script src="./boton-copias.js?v=081"></script>
+
+  <!-- Restauración de copias -->
+  <script src="./restauracion.js?v=092"></script>
+
+  <!-- Pantalla de restauración -->
+  <script src="./pantalla-restauracion.js?v=093"></script>
 
   <!-- Funcionamiento sin conexión -->
   <script>
