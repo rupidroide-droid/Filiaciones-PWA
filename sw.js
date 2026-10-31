@@ -1,21 +1,22 @@
 
 /*
  * FILIACIONES - SERVICE WORKER
- * Beta 0.9.6
+ * Beta 0.9.7
  *
- * Caché de aplicación con formulario
- * de actuaciones mejorado.
+ * Caché de aplicación con exportación
+ * local a documentos Word DOCX.
  *
  * Las actuaciones cifradas se guardan
  * en IndexedDB, no en Cache Storage.
  */
 
-const CACHE = "filiaciones-app-v096";
+const CACHE = "filiaciones-app-v097";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
-  "./app.js?v=096",
+  "./exportacion.js?v=097",
+  "./app.js?v=097",
   "./almacenamiento.js",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
@@ -66,7 +67,7 @@ self.addEventListener("fetch", event => {
     req.mode === "navigate";
 
   const esArchivo =
-    /\/(?:index\.html|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js|restauracion\.js|pantalla-restauracion\.js)$/.test(
+    /\/(?:index\.html|exportacion\.js|app\.js|almacenamiento\.js|seguridad\.js|copias\.js|boton-copias\.js|restauracion\.js|pantalla-restauracion\.js)$/.test(
       url.pathname
     );
 
