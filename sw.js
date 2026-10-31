@@ -1,22 +1,23 @@
 
 /*
  * FILIACIONES - SERVICE WORKER
- * Beta 0.9.8
+ * Beta 0.9.9
  *
- * Vinculaciones entre personas y vehículos.
- * Exportación Word Beta 0.9.7.
+ * Dos formatos de exportación Word:
+ * - Ficha de filiación
+ * - Texto para diligencia
  *
  * Las actuaciones cifradas permanecen
  * en IndexedDB, no en Cache Storage.
  */
 
-const CACHE = "filiaciones-app-v098";
+const CACHE = "filiaciones-app-v099";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
-  "./exportacion.js?v=097",
-  "./app.js?v=098",
+  "./exportacion.js?v=099",
+  "./app.js?v=099",
   "./almacenamiento.js",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
