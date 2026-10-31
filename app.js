@@ -1,8 +1,12 @@
 
 /*
- * FILIACIONES BETA 0.9.8
- * Vinculación de personas y vehículos.
- * SOLO DATOS FICTICIOS.
+ * FILIACIONES BETA 0.9.9
+ *
+ * Personas, vehículos y objetos.
+ * Vinculaciones múltiples.
+ * Exportación de ficha y diligencia Word.
+ *
+ * PROTOTIPO: SOLO DATOS FICTICIOS.
  */
 "use strict";
 
@@ -126,8 +130,6 @@ function normalizar(registro) {
     }
   }
 
-  // Adaptación en memoria de actuaciones antiguas.
-  // No se guardan cambios hasta pulsar Guardar.
   const usados = new Set();
 
   for (const persona of obj.personas) {
@@ -137,6 +139,7 @@ function normalizar(registro) {
     ) {
       persona.idPersona = identificador();
     }
+
     usados.add(persona.idPersona);
   }
 
@@ -163,6 +166,7 @@ function comprobarAcceso() {
     acceso();
     return false;
   }
+
   return true;
 }
 
@@ -188,7 +192,9 @@ function leer() {
         actuacion[nombre] = e.value;
       } else {
         const registro =
-          actuacion[tipo]?.[Number(e.dataset.indice)];
+          actuacion[tipo]?.[
+            Number(e.dataset.indice)
+          ];
 
         if (registro) {
           registro[nombre] = e.value;
@@ -199,8 +205,10 @@ function leer() {
 
 function comprobarCambios() {
   leer();
+
   cambiosPendientes =
     instantanea() !== estadoGuardado;
+
   return cambiosPendientes;
 }
 
@@ -226,7 +234,8 @@ function campo(
   const l = document.createElement("label");
 
   l.style.cssText =
-    "display:block;margin:12px 0;font-weight:600";
+    "display:block;margin:12px 0;" +
+    "font-weight:600";
 
   l.textContent = etiqueta;
 
@@ -244,7 +253,9 @@ function campo(
             ? "tel"
             : "text";
 
-  e.value = valor == null ? "" : String(valor);
+  e.value =
+    valor == null ? "" : String(valor);
+
   e.dataset.campo = nombre;
 
   if (tipo) {
@@ -329,7 +340,11 @@ function abrirVehiculo(indice) {
   }
 }
 
-function vinculaciones(vehiculo, indice, destino) {
+function vinculaciones(
+  vehiculo,
+  indice,
+  destino
+) {
   const caja = document.createElement("div");
 
   caja.style.cssText =
@@ -342,56 +357,72 @@ function vinculaciones(vehiculo, indice, destino) {
 
   if (!actuacion.personas.length) {
     aviso(
-      "Añade primero una persona para vincularla.",
+      "Añade primero una persona " +
+      "para vincularla.",
       caja
     );
   }
 
-  vehiculo.vinculos.forEach((relacion, j) => {
-    const persona = actuacion.personas.find(
-      p => p.idPersona === relacion.personaId
-    );
+  vehiculo.vinculos.forEach(
+    (relacion, j) => {
+      const persona = actuacion.personas.find(
+        p =>
+          p.idPersona === relacion.personaId
+      );
 
-    if (!persona) return;
+      if (!persona) return;
 
-    const fila = document.createElement("div");
+      const fila = document.createElement("div");
 
-    fila.style.cssText =
-      "border:1px solid #ddd;" +
-      "border-radius:8px;" +
-      "padding:10px;margin:8px 0";
+      fila.style.cssText =
+        "border:1px solid #ddd;" +
+        "border-radius:8px;" +
+        "padding:10px;margin:8px 0";
 
-    aviso(
-      (persona.nombre ||
-        "Persona " +
-        (actuacion.personas.indexOf(persona) + 1)) +
-      " — " + relacion.rol,
-      fila
-    );
+      aviso(
+        (
+          persona.nombre ||
+          "Persona " +
+          (
+            actuacion.personas.indexOf(persona) +
+            1
+          )
+        ) +
+        " — " +
+        relacion.rol,
+        fila
+      );
 
-    boton(
-      "Quitar vinculación",
-      () => {
-        leer();
-        vehiculo.vinculos.splice(j, 1);
-        cambiosPendientes = true;
-        dibujar();
-        abrirVehiculo(indice);
-      },
-      fila
-    );
+      boton(
+        "Quitar vinculación",
+        () => {
+          leer();
 
-    caja.append(fila);
-  });
+          vehiculo.vinculos.splice(j, 1);
+          cambiosPendientes = true;
+
+          dibujar();
+          abrirVehiculo(indice);
+        },
+        fila
+      );
+
+      caja.append(fila);
+    }
+  );
 
   if (actuacion.personas.length) {
-    const disponibles = actuacion.personas.map(
-      (persona, i) => [
-        persona.idPersona,
-        (i + 1) + ". " +
-        (persona.nombre || "Sin nombre")
-      ]
-    );
+    const disponibles =
+      actuacion.personas.map(
+        (persona, i) => [
+          persona.idPersona,
+          (i + 1) + ". " +
+          (
+            persona.nombre ||
+            "Sin nombre"
+          )
+        ]
+      );
 
     const selectorPersona = selector(
       disponibles,
@@ -403,22 +434,29 @@ function vinculaciones(vehiculo, indice, destino) {
       roles[0]
     );
 
-    caja.append(selectorPersona, selectorRol);
+    caja.append(
+      selectorPersona,
+      selectorRol
+    );
 
     boton(
       "+ Vincular persona",
       () => {
         leer();
 
-        const existe = vehiculo.vinculos.some(
-          relacion =>
-            relacion.personaId ===
-              selectorPersona.value &&
-            relacion.rol === selectorRol.value
-        );
+        const existe =
+          vehiculo.vinculos.some(
+            relacion =>
+              relacion.personaId ===
+                selectorPersona.value &&
+              relacion.rol ===
+                selectorRol.value
+          );
 
         if (existe) {
-          alert("Esta vinculación ya existe.");
+          alert(
+            "Esta vinculación ya existe."
+          );
           return;
         }
 
@@ -428,6 +466,7 @@ function vinculaciones(vehiculo, indice, destino) {
         });
 
         cambiosPendientes = true;
+
         dibujar();
         abrirVehiculo(indice);
       },
@@ -450,17 +489,25 @@ function ficha(tipo, registro, indice) {
     "color:#17253c"
   ].join(";");
 
-  const encabezado = document.createElement("summary");
+  const encabezado =
+    document.createElement("summary");
 
   encabezado.textContent =
-    nombres[tipo] + " " + (indice + 1);
+    nombres[tipo] +
+    " " +
+    (indice + 1);
 
   encabezado.style.cssText =
-    "font-weight:700;cursor:pointer;padding:8px 0";
+    "font-weight:700;" +
+    "cursor:pointer;" +
+    "padding:8px 0";
 
   d.append(encabezado);
 
-  for (const [nombre, etiqueta] of esquemas[tipo]) {
+  for (
+    const [nombre, etiqueta]
+    of esquemas[tipo]
+  ) {
     d.append(
       campo(
         etiqueta,
@@ -473,13 +520,18 @@ function ficha(tipo, registro, indice) {
   }
 
   if (tipo === "vehiculos") {
-    vinculaciones(registro, indice, d);
+    vinculaciones(
+      registro,
+      indice,
+      d
+    );
   }
 
   boton(
     "Eliminar " +
     nombres[tipo].toLowerCase() +
-    " " + (indice + 1),
+    " " +
+    (indice + 1),
     () => {
       leer();
 
@@ -500,20 +552,27 @@ function ficha(tipo, registro, indice) {
       const mensaje =
         "¿Eliminar " +
         nombres[tipo].toLowerCase() +
-        " " + (indice + 1) +
+        " " +
+        (indice + 1) +
         " de esta actuación?" +
-        (afectados
-          ? "\n\nTambién se eliminarán " +
-            afectados +
-            " vinculaciones con vehículos."
-          : "") +
-        "\n\nEl cambio se guardará cuando " +
-        "pulses Guardar actuación cifrada.";
+        (
+          afectados
+            ? "\n\nTambién se eliminarán " +
+              afectados +
+              " vinculaciones con vehículos."
+            : ""
+        ) +
+        "\n\nEl cambio se guardará " +
+        "cuando pulses Guardar " +
+        "actuación cifrada.";
 
       if (!confirm(mensaje)) return;
 
       if (tipo === "personas") {
-        for (const vehiculo of actuacion.vehiculos) {
+        for (
+          const vehiculo
+          of actuacion.vehiculos
+        ) {
           vehiculo.vinculos =
             vehiculo.vinculos.filter(
               relacion =>
@@ -524,6 +583,7 @@ function ficha(tipo, registro, indice) {
       }
 
       actuacion[tipo].splice(indice, 1);
+
       cambiosPendientes = true;
       dibujar();
     },
@@ -538,7 +598,8 @@ function seccion(tipo) {
   s.dataset.tipo = tipo;
 
   s.style.cssText =
-    "margin:20px 0;padding:12px 0;" +
+    "margin:20px 0;" +
+    "padding:12px 0;" +
     "border-top:1px solid #cbd5e1";
 
   const h = document.createElement("h3");
@@ -546,22 +607,32 @@ function seccion(tipo) {
   h.textContent =
     tipo.charAt(0).toUpperCase() +
     tipo.slice(1) +
-    " (" + actuacion[tipo].length + ")";
+    " (" +
+    actuacion[tipo].length +
+    ")";
 
   s.append(h);
 
-  actuacion[tipo].forEach((registro, indice) => {
-    s.append(ficha(tipo, registro, indice));
-  });
+  actuacion[tipo].forEach(
+    (registro, indice) => {
+      s.append(
+        ficha(tipo, registro, indice)
+      );
+    }
+  );
 
   boton(
-    "+ Añadir " + nombres[tipo].toLowerCase(),
+    "+ Añadir " +
+    nombres[tipo].toLowerCase(),
     () => {
       leer();
 
       const nuevo = {};
 
-      for (const [nombre] of esquemas[tipo]) {
+      for (
+        const [nombre]
+        of esquemas[tipo]
+      ) {
         nuevo[nombre] = "";
       }
 
@@ -574,15 +645,21 @@ function seccion(tipo) {
       }
 
       actuacion[tipo].push(nuevo);
+
       cambiosPendientes = true;
       dibujar();
 
-      const seccionActual = principal().querySelector(
-        'section[data-tipo="' + tipo + '"]'
-      );
+      const seccionActual =
+        principal().querySelector(
+          'section[data-tipo="' +
+          tipo +
+          '"]'
+        );
 
       const ultima = Array.from(
-        seccionActual.querySelectorAll("details")
+        seccionActual.querySelectorAll(
+          "details"
+        )
       ).at(-1);
 
       if (ultima) {
@@ -600,27 +677,50 @@ function seccion(tipo) {
 }
 
 function dibujar() {
-  if (!comprobarAcceso() || !actuacion) return;
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return;
+  }
 
   limpiar();
   titulo("Ficha de actuación");
 
   aviso(
     actuacion.id
-      ? "Actuación guardada. Puedes modificarla."
-      : "Nueva actuación. Pendiente de guardar."
+      ? "Actuación guardada. " +
+        "Puedes modificarla."
+      : "Nueva actuación. " +
+        "Pendiente de guardar."
   );
 
-  for (const [nombre, etiqueta] of [
-    ["referencia", "Referencia de actuación"],
-    ["numeroAtestado", "Número de atestado (si existe)"],
-    ["fecha", "Fecha"],
-    ["hora", "Hora"],
-    ["lugar", "Lugar"],
-    ["agentes", "Agentes intervinientes"]
-  ]) {
+  for (
+    const [nombre, etiqueta]
+    of [
+      [
+        "referencia",
+        "Referencia de actuación"
+      ],
+      [
+        "numeroAtestado",
+        "Número de atestado (si existe)"
+      ],
+      ["fecha", "Fecha"],
+      ["hora", "Hora"],
+      ["lugar", "Lugar"],
+      [
+        "agentes",
+        "Agentes intervinientes"
+      ]
+    ]
+  ) {
     principal().append(
-      campo(etiqueta, nombre, actuacion[nombre])
+      campo(
+        etiqueta,
+        nombre,
+        actuacion[nombre]
+      )
     );
   }
 
@@ -628,17 +728,40 @@ function dibujar() {
   seccion("vehiculos");
   seccion("objetos");
 
-  boton("Guardar actuación cifrada", guardarActual);
-  boton("Exportar a Word (.docx)", exportarWord);
+  boton(
+    "Guardar actuación cifrada",
+    guardarActual
+  );
+
+  boton(
+    "Exportar ficha de filiación (.docx)",
+    () => exportarWord("ficha")
+  );
+
+  boton(
+    "Exportar texto para diligencia (.docx)",
+    () => exportarWord("diligencia")
+  );
+
   boton("Ver resumen", resumen);
 
-  boton("Volver al menú", () => {
-    if (confirmarSalida()) menu();
-  });
+  boton(
+    "Volver al menú",
+    () => {
+      if (confirmarSalida()) {
+        menu();
+      }
+    }
+  );
 
-  boton("Bloquear aplicación", () => {
-    if (confirmarSalida()) bloquear();
-  });
+  boton(
+    "Bloquear aplicación",
+    () => {
+      if (confirmarSalida()) {
+        bloquear();
+      }
+    }
+  );
 
   aviso(
     "PROTOTIPO: solo datos ficticios. " +
@@ -646,21 +769,34 @@ function dibujar() {
   );
 }
 
-async function exportarWord() {
-  if (!comprobarAcceso() || !actuacion) return;
+async function exportarWord(
+  formato = "ficha"
+) {
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return;
+  }
 
   try {
     if (!window.Exportacion?.exportar) {
       throw Error(
-        "El módulo de exportación no está cargado."
+        "El módulo de exportación " +
+        "no está cargado."
       );
     }
 
     leer();
 
-    if (!actuacion.referencia.trim()) {
+    if (
+      !String(
+        actuacion.referencia || ""
+      ).trim()
+    ) {
       throw Error(
-        "Introduce una referencia para exportar."
+        "Introduce una referencia " +
+        "para exportar."
       );
     }
 
@@ -668,8 +804,9 @@ async function exportarWord() {
       comprobarCambios() &&
       !confirm(
         "Hay cambios sin guardar.\n\n" +
-        "El documento incluirá los datos actuales, " +
-        "aunque no estén guardados.\n\n" +
+        "El documento incluirá los " +
+        "datos actuales, aunque no " +
+        "estén guardados.\n\n" +
         "¿Continuar?"
       )
     ) {
@@ -677,39 +814,59 @@ async function exportarWord() {
     }
 
     await window.Exportacion.exportar(
-      structuredClone(actuacion)
+      structuredClone(actuacion),
+      formato
     );
 
   } catch (e) {
-    if (e?.name !== "AbortError") {
+    if (
+      e?.name !== "AbortError"
+    ) {
       error(e);
     }
   }
 }
 
 async function guardarActual() {
-  if (!comprobarAcceso() || !actuacion) return;
+  if (
+    !comprobarAcceso() ||
+    !actuacion
+  ) {
+    return;
+  }
 
   try {
     leer();
 
-    if (!actuacion.referencia.trim()) {
+    if (
+      !String(
+        actuacion.referencia || ""
+      ).trim()
+    ) {
       throw Error(
-        "Introduce una referencia para la actuación"
+        "Introduce una referencia " +
+        "para la actuación."
       );
     }
 
-    const id = await Almacenamiento.guardar(actuacion);
+    const id =
+      await Almacenamiento.guardar(
+        actuacion
+      );
 
     marcarGuardado();
 
     alert(
-      "Actuación guardada correctamente.\n\n" +
-      "Referencia: " + actuacion.referencia +
-      "\nID: " + id
+      "Actuación guardada " +
+      "correctamente.\n\n" +
+      "Referencia: " +
+      actuacion.referencia +
+      "\nID: " +
+      id
     );
 
     dibujar();
+
   } catch (e) {
     error(e);
   }
@@ -720,7 +877,10 @@ function resumen() {
 
   leer();
 
-  let p = document.getElementById("resumen");
+  let p =
+    document.getElementById(
+      "resumen"
+    );
 
   if (!p) {
     p = document.createElement("pre");
@@ -738,7 +898,12 @@ function resumen() {
     principal().append(p);
   }
 
-  p.textContent = JSON.stringify(actuacion, null, 2);
+  p.textContent =
+    JSON.stringify(
+      actuacion,
+      null,
+      2
+    );
 
   p.scrollIntoView({
     behavior: "smooth",
@@ -760,48 +925,71 @@ async function acceso() {
   titulo("Acceso a Filiaciones");
 
   try {
-    const existe = await Almacenamiento.existe();
+    const existe =
+      await Almacenamiento.existe();
 
-    const p = document.createElement("input");
+    const p =
+      document.createElement("input");
+
     p.type = "password";
     p.autocomplete = "off";
 
     p.placeholder = existe
       ? "Contraseña general"
-      : "Nueva contraseña (mínimo 12 caracteres)";
+      : "Nueva contraseña " +
+        "(mínimo 12 caracteres)";
 
     p.style.cssText =
-      "display:block;width:100%;" +
-      "box-sizing:border-box;padding:12px;" +
-      "margin:12px 0;font-size:16px";
+      "display:block;" +
+      "width:100%;" +
+      "box-sizing:border-box;" +
+      "padding:12px;" +
+      "margin:12px 0;" +
+      "font-size:16px";
 
     principal().append(p);
 
     let confirmar = null;
 
     if (!existe) {
-      confirmar = document.createElement("input");
+      confirmar =
+        document.createElement("input");
+
       confirmar.type = "password";
       confirmar.autocomplete = "off";
-      confirmar.placeholder = "Repite la contraseña";
-      confirmar.style.cssText = p.style.cssText;
+      confirmar.placeholder =
+        "Repite la contraseña";
+
+      confirmar.style.cssText =
+        p.style.cssText;
+
       principal().append(confirmar);
     }
 
     boton(
-      existe ? "Desbloquear" : "Crear contraseña",
+      existe
+        ? "Desbloquear"
+        : "Crear contraseña",
       async () => {
         try {
           if (existe) {
-            await Almacenamiento.desbloquear(p.value);
+            await Almacenamiento.desbloquear(
+              p.value
+            );
           } else {
-            if (p.value !== confirmar.value) {
+            if (
+              p.value !==
+              confirmar.value
+            ) {
               throw Error(
-                "Las contraseñas no coinciden"
+                "Las contraseñas " +
+                "no coinciden."
               );
             }
 
-            await Almacenamiento.configurar(p.value);
+            await Almacenamiento.configurar(
+              p.value
+            );
           }
 
           p.value = "";
@@ -811,6 +999,7 @@ async function acceso() {
           }
 
           menu();
+
         } catch (e) {
           error(e);
         }
@@ -818,7 +1007,8 @@ async function acceso() {
     );
 
     aviso(
-      "Versión de pruebas. No introduzcas datos reales."
+      "Versión de pruebas. " +
+      "No introduzcas datos reales."
     );
 
   } catch (e) {
@@ -827,7 +1017,9 @@ async function acceso() {
 }
 
 function menu() {
-  if (!Almacenamiento.desbloqueado()) {
+  if (
+    !Almacenamiento.desbloqueado()
+  ) {
     return acceso();
   }
 
@@ -836,16 +1028,25 @@ function menu() {
   estadoGuardado = "";
 
   limpiar();
-  titulo("Filiaciones — acceso desbloqueado");
 
-  boton("Nueva actuación", nuevaActuacion);
+  titulo(
+    "Filiaciones — acceso desbloqueado"
+  );
+
+  boton(
+    "Nueva actuación",
+    nuevaActuacion
+  );
 
   boton(
     "Consultar actuaciones guardadas",
     consultar
   );
 
-  boton("Bloquear aplicación", bloquear);
+  boton(
+    "Bloquear aplicación",
+    bloquear
+  );
 
   aviso(
     "Prototipo: no verificado para " +
@@ -863,34 +1064,50 @@ async function consultar() {
   titulo("Actuaciones guardadas");
 
   try {
-    const lista = await Almacenamiento.listar();
+    const lista =
+      await Almacenamiento.listar();
 
-    if (!Almacenamiento.desbloqueado()) {
+    if (
+      !Almacenamiento.desbloqueado()
+    ) {
       return acceso();
     }
 
     if (!lista.length) {
-      aviso("No hay actuaciones guardadas.");
+      aviso(
+        "No hay actuaciones guardadas."
+      );
     }
 
     for (const registro of lista) {
-      const s = document.createElement("section");
+      const s =
+        document.createElement("section");
 
       s.style.cssText =
-        "padding:12px;margin:10px 0;" +
-        "border:1px solid #888;border-radius:8px";
+        "padding:12px;" +
+        "margin:10px 0;" +
+        "border:1px solid #888;" +
+        "border-radius:8px";
 
       aviso(
         "Referencia: " +
-        (registro.referencia || "(sin referencia)") +
-        " — " + (registro.fecha || ""),
+        (
+          registro.referencia ||
+          "(sin referencia)"
+        ) +
+        " — " +
+        (
+          registro.fecha || ""
+        ),
         s
       );
 
       boton(
         "Abrir y editar",
         () => {
-          actuacion = normalizar(registro);
+          actuacion =
+            normalizar(registro);
+
           marcarGuardado();
           dibujar();
         },
@@ -900,18 +1117,25 @@ async function consultar() {
       boton(
         "Eliminar",
         async () => {
-          if (!confirm(
-            "¿Eliminar definitivamente esta " +
-            "actuación de prueba?\n\n" +
-            "Esta operación no se puede deshacer " +
-            "sin una copia de seguridad."
-          )) {
+          if (
+            !confirm(
+              "¿Eliminar definitivamente " +
+              "esta actuación de prueba?\n\n" +
+              "Esta operación no se puede " +
+              "deshacer sin una copia " +
+              "de seguridad."
+            )
+          ) {
             return;
           }
 
           try {
-            await Almacenamiento.eliminar(registro.id);
+            await Almacenamiento.eliminar(
+              registro.id
+            );
+
             await consultar();
+
           } catch (e) {
             error(e);
           }
@@ -926,30 +1150,56 @@ async function consultar() {
     error(e);
   }
 
-  boton("Volver al menú", menu);
-  boton("Bloquear aplicación", bloquear);
+  boton(
+    "Volver al menú",
+    menu
+  );
+
+  boton(
+    "Bloquear aplicación",
+    bloquear
+  );
 }
 
 window.mostrar = function(nombre) {
-  if (!Almacenamiento.desbloqueado()) {
+  if (
+    !Almacenamiento.desbloqueado()
+  ) {
     return acceso();
   }
 
-  if (actuacion && !confirmarSalida()) {
+  if (
+    actuacion &&
+    !confirmarSalida()
+  ) {
     return;
   }
 
-  if (nombre === "Nueva actuación") {
+  if (
+    nombre === "Nueva actuación"
+  ) {
     nuevaActuacion();
-  } else if (nombre === "Consultar actuaciones") {
+
+  } else if (
+    nombre === "Consultar actuaciones"
+  ) {
     consultar();
+
   } else {
-    alert(nombre + ": módulo pendiente.");
+    alert(
+      nombre +
+      ": módulo pendiente."
+    );
   }
 };
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", acceso);
+if (
+  document.readyState === "loading"
+) {
+  document.addEventListener(
+    "DOMContentLoaded",
+    acceso
+  );
 } else {
   acceso();
 }
