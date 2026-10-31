@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+
+<title>Filiaciones - Verificar copia</title>
+
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    background: #f3f5f9;
+    color: #17253c;
+  }
+
+  header {
+    background: #17365d;
+    color: white;
+    padding: 22px;
+  }
+
+  main {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+  }
+
+  .panel {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+
+  label {
+    display: block;
+    margin-top: 15px;
+    font-weight: 600;
+  }
+
+  input, button {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px;
+    margin-top: 8px;
+    font-size: 16px;
+    border-radius: 9px;
+  }
+
+  input {
+    border: 1px solid #aab5c4;
+  }
+
+  button {
+    border: none;
+    background: #17365d;
+    color: white;
+    margin-top: 20px;
+  }
+
+  button:disabled {
+    opacity: .5;
+  }
+
+  #resultado {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .aviso {
+    font-size: 14px;
+    color: #475569;
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>Verificar copia cifrada</h1>
+  <p>Filiaciones - Recuperación de pruebas</p>
+</header>
+
+<main>
+
+  <div class="panel">
+    <p>
+      Selecciona una copia JSON de Filiaciones.
+      Esta herramienta no importa ni elimina actuaciones.
+    </p>
+
+    <label for="archivo">Archivo de copia</label>
+    <input
+      id="archivo"
+      type="file"
+      accept=".json,application/json">
+
+    <label for="password">Contraseña general</label>
+    <input
+      id="password"
+      type="password"
+      autocomplete="off"
+      spellcheck="false">
+
+    <button id="verificar" type="button">
+      Verificar copia
+    </button>
+  </div>
+
+  <div class="panel">
+    <strong>Resultado</strong>
+    <p id="resultado" role="status">
+      Esperando archivo.
+    </p>
+  </div>
+
+  <p class="aviso">
+    Usa exclusivamente datos ficticios.
+    La contraseña no se guarda ni se envía.
+    La herramienta no modifica IndexedDB.
+  </p>
+
+</main>
+
+<script>
+"use strict";
+
+(() => {
+  const archivo = document.getElementById("archivo");
+  const password = document.getElementById("password");
+  const boton = document.getElementById("verificar");
+  const resultado = document.getElementById("resultado");
+
+  const decodificar = texto =>
+    Uint8Array.from(
+      atob(texto),
+      caracter => caracter.charCodeAt(0)
+    );
+
+  async function derivar(pass, salt) {
+    const material = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(pass),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+
+    return crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: decodificar(salt),
+        iterations: 310000,
+        hash: "SHA-256"
+      },
+      material,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+  }
+
+  async function descifrar(registro, clave) {
+    const datos = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: decodificar(registro.iv)
+      },
+      clave,
+      decodificar(registro.contenido)
+    );
+
+    return JSON.parse(
+      new TextDecoder().decode(datos)
+    );
+  }
+
+  boton.addEventListener("click", async () => {
+    boton.disabled = true;
+    resultado.textContent = "Verificando...";
+
+    try {
+      if (!archivo.files.length) {
+        throw Error("Selecciona un archivo JSON.");
+      }
+
+      if (!password.value) {
+        throw Error("Introduce tu contraseña general.");
+      }
+
+      const fichero = archivo.files[0];
+
+      if (fichero.size > 10 * 1024 * 1024) {
+        throw Error("Archivo demasiado grande.");
+      }
+
+      const copia = JSON.parse(await fichero.text());
+
+      if (
+        copia.formato !== "FILIACIONES_BACKUP_V1" ||
+        !Array.isArray(copia.registros) ||
+        typeof copia.config?.salt !== "string" ||
+        !copia.config?.test
+      ) {
+        throw Error("Formato de copia no válido.");
+      }
+
+      const clave = await derivar(
+        password.value,
+        copia.config.salt
+      );
+
+      const comprobacion = await descifrar(
+        copia.config.test,
+        clave
+      );
+
+      if (
+        comprobacion.verificacion !== "FILIACIONES_V1"
+      ) {
+        throw Error("Verificación incorrecta.");
+      }
+
+      const actuaciones = [];
+
+      for (const registro of copia.registros) {
+        const datos = await descifrar(registro, clave);
+        actuaciones.push(datos);
+      }
+
+      resultado.textContent =
+        "Contraseña correcta.\n" +
+        "Copia descifrada correctamente.\n\n" +
+        "Actuaciones encontradas: " +
+        actuaciones.length + "\n\n" +
+        actuaciones.map((a, i) =>
+          (i + 1) + ". " +
+          (
+            a.nombre ||
+            a.numero ||
+            a.titulo ||
+            a.referencia ||
+            a.id ||
+            "Actuación sin título"
+          )
+        ).join("\n");
+
+    } catch (error) {
+      resultado.textContent =
+        "No se pudo verificar la copia.\n" +
+        "Comprueba el archivo y la contraseña.\n\n" +
+        error.message;
+    } finally {
+      password.value = "";
+      boton.disabled = false;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
