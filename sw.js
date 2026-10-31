@@ -1,21 +1,21 @@
 
 /*
  * FILIACIONES - SERVICE WORKER
- * Beta 0.9.5
+ * Beta 0.9.6
  *
- * Caché de aplicación con restauración
- * y diagnóstico de errores.
+ * Caché de aplicación con formulario
+ * de actuaciones mejorado.
  *
- * Los registros cifrados se almacenan
+ * Las actuaciones cifradas se guardan
  * en IndexedDB, no en Cache Storage.
  */
 
-const CACHE = "filiaciones-app-v095";
+const CACHE = "filiaciones-app-v096";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
-  "./app.js?v=061",
+  "./app.js?v=096",
   "./almacenamiento.js",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
