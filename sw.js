@@ -1,22 +1,22 @@
 
 /*
  * FILIACIONES - SERVICE WORKER
- * Beta 0.9.7
+ * Beta 0.9.8
  *
- * Caché de aplicación con exportación
- * local a documentos Word DOCX.
+ * Vinculaciones entre personas y vehículos.
+ * Exportación Word Beta 0.9.7.
  *
- * Las actuaciones cifradas se guardan
+ * Las actuaciones cifradas permanecen
  * en IndexedDB, no en Cache Storage.
  */
 
-const CACHE = "filiaciones-app-v097";
+const CACHE = "filiaciones-app-v098";
 
 const ARCHIVOS = [
   "./",
   "./index.html",
   "./exportacion.js?v=097",
-  "./app.js?v=097",
+  "./app.js?v=098",
   "./almacenamiento.js",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
