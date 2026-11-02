@@ -13,7 +13,7 @@ const ARCHIVOS = [
   "./",
   "./index.html",
   "./almacenamiento.js",
-  "./exportacion.js?v=0911",
+  "./exportacion.js?v=0912",
   "./app.js?v=0911",
   "./seguridad.js?v=071",
   "./copias.js?v=080",
