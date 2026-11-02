@@ -311,24 +311,26 @@ window.Exportacion = (() => {
 
       locales.push(l, n, d);
 
-      const c = Uint8Array.from([
-        ...u32(0x02014b50),
-        ...u16(20),
-        ...u16(20),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u32(crc),
-        ...u32(d.length),
-        ...u32(d.length),
-        ...u16(n.length),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u32(desplazamiento)
-      ]);
+      
+const c = Uint8Array.from([
+  ...u32(0x02014b50),
+  ...u16(20),
+  ...u16(20),
+  ...u16(0),
+  ...u16(0),
+  ...u16(0),
+  ...u16(0),
+  ...u32(crc),
+  ...u32(d.length),
+  ...u32(d.length),
+  ...u16(n.length),
+  ...u16(0),
+  ...u16(0),
+  ...u16(0),
+  ...u16(0),
+  ...u32(0),
+  ...u32(desplazamiento)
+]);
 
       centrales.push(c, n);
 
