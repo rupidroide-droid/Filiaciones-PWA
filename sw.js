@@ -7,7 +7,7 @@
  * No elimina actuaciones ni bases de datos.
  */
 
-const CACHE = "filiaciones-app-v0911";
+const CACHE = "filiaciones-app-v0912";
 
 const ARCHIVOS = [
   "./",
